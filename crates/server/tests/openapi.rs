@@ -24,6 +24,15 @@ fn spec_is_openapi_3_2_and_documents_every_route() {
         ("/user/all", "get"),
         ("/user", "delete"),
         ("/ws", "get"),
+        ("/api/WeatherForecasts", "get"),
+        ("/api/TodoLists", "get"),
+        ("/api/TodoLists", "post"),
+        ("/api/TodoLists/{id}", "put"),
+        ("/api/TodoLists/{id}", "delete"),
+        ("/api/TodoItems", "post"),
+        ("/api/TodoItems/{id}", "put"),
+        ("/api/TodoItems/{id}", "delete"),
+        ("/api/TodoItems/UpdateDetail/{id}", "patch"),
     ] {
         assert!(paths.get(path).is_some_and(|p| p.get(method).is_some()), "missing {method} {path}");
     }

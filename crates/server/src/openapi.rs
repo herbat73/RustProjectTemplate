@@ -10,7 +10,7 @@ use utoipa::{
     Modify, OpenApi,
 };
 
-use crate::controllers::{auth_controller, users_controller, weather_controller, ws_controller};
+use crate::controllers::{auth_controller, todo_items_controller, todo_lists_controller, users_controller, weather_controller, ws_controller};
 
 struct SecuritySchemes;
 
@@ -54,6 +54,14 @@ impl Modify for SecuritySchemes {
         users_controller::get_all_user_info,
         users_controller::delete_user,
         weather_controller::get_weather_forecasts,
+        todo_lists_controller::get_todo_lists,
+        todo_lists_controller::create_todo_list,
+        todo_lists_controller::update_todo_list,
+        todo_lists_controller::delete_todo_list,
+        todo_items_controller::create_todo_item,
+        todo_items_controller::update_todo_item,
+        todo_items_controller::update_todo_item_detail,
+        todo_items_controller::delete_todo_item,
         ws_controller::ws_docs,
     ),
     components(schemas(
@@ -64,6 +72,16 @@ impl Modify for SecuritySchemes {
         types::auth::AuthErrorBody,
         types::auth::AuthErrorType,
         types::weather::WeatherForecast,
+        types::todo::TodosVm,
+        types::todo::TodoListDto,
+        types::todo::TodoItemDto,
+        types::todo::LookupDto,
+        types::todo::ColourDto,
+        types::todo::CreateTodoListCommand,
+        types::todo::UpdateTodoListCommand,
+        types::todo::CreateTodoItemCommand,
+        types::todo::UpdateTodoItemCommand,
+        types::todo::UpdateTodoItemDetailCommand,
     )),
     modifiers(&SecuritySchemes),
     tags(
@@ -71,6 +89,8 @@ impl Modify for SecuritySchemes {
         (name = "user", description = "User management"),
         (name = "chat", description = "Chat WebSocket"),
         (name = "WeatherForecasts", description = "Random weather forecasts"),
+        (name = "TodoLists", description = "Todo lists"),
+        (name = "TodoItems", description = "Todo items"),
     )
 )]
 pub struct ApiDoc;
