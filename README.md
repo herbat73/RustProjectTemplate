@@ -2,7 +2,7 @@
 
 Modified Full stack rust template from https://github.com/sollambert/rust-full-stack-with-auth-template 
 
-This template is built using Dioxus, Tailwinds, Axum, Sqlx, and Tauri.
+This template is built using Dioxus, Tailwinds, Axum, Sqlx, utoipa, Tauri.
 
 This project is built to make full stack development with user authentication easily accessible for developers within an entirely Rust ecosystem.
 
