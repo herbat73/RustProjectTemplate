@@ -59,12 +59,18 @@ cd crates/frontend
 trunk serve
 ```
 
-Run migrations
+Run migrations (creates the database first if it does not exist)
 ```bash
 # Postgres
-sqlx migrate run --source migrations/postgres
+scripts/migrate.sh postgres
 # SQLite
-sqlx migrate run --source migrations/sqlite
+scripts/migrate.sh sqlite
+```
+
+Equivalent manual commands
+```bash
+sqlx database create   # no-op if the database already exists
+sqlx migrate run --source migrations/postgres
 ```
 
 Revert migrations
@@ -83,19 +89,20 @@ Required environment variables, these can be stored in a .env file at the top le
 # Base URL for the frontend to communicate with the API, by default TLS is not enabled and will require you to implement
 BASE_URL=http://localhost:3001
 # Database URL, SQLx will infer the database type by URL if not specifying with package feature
-DATABASE_URL=jdbc:postgresql://localhost:5432/
+#DATABASE_URL=jdbc:postgresql://localhost:5432/
+DATABASE_URL=postgres://admin:password@127.0.0.1:5433/rest_db
 # 16 byte salt
-PASSWORD_SALT=THISISABADSALT!!
+PASSWORD_SALT=+WCYakRM2cjNAb17KNAiTQ==
 # length in seconds the auth token with access information should live, keep it very short
 AUTH_TOKEN_EXPIRE=1
 # length in seconds the auth requester token should live, this should be the length of time before someone must authenticate with username/password again
 AUTH_REQUEST_TOKEN_EXPIRE=84600
 # Private secret used for encrypting/decrypting JWT
-AUTH_TOKEN_SECRET=THISISABADSECRET
+AUTH_TOKEN_SECRET=PcsE0DUh4hxLMHjuk7rajSLk9R8F155P8NCpDRxr+L8=
 # Company name to set as the Iss claim in JWTs
-COMPANY_NAME=PanuccisPizza
+COMPANY_NAME=Example
 # Company domain to set as the Aud claim in JWTs
-COMPANY_DOMAIN=pannucispizza.slice
+COMPANY_DOMAIN=example.com
 # Host for mail server to serve password reset emails
 SMTP_HOST=mailserver.example.io
 # Username for account on mailserver to auth
