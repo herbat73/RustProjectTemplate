@@ -141,6 +141,25 @@ async fn api_flow() {
     assert_eq!(response.json()["error_type"], "InvalidToken");
     assert_eq!(get(&app, "/user/info", Some("garbage")).await.status, StatusCode::FORBIDDEN);
 
+    // --- weather forecasts (random data, token-protected) ---
+    let response = get(&app, "/api/WeatherForecasts", None).await;
+    assert_eq!(response.status, StatusCode::FORBIDDEN);
+    assert_eq!(get(&app, "/api/WeatherForecasts", Some(&requester)).await.status, StatusCode::FORBIDDEN);
+
+    let response = get(&app, "/api/WeatherForecasts", Some(&access)).await;
+    assert_eq!(response.status, StatusCode::OK, "body: {}", response.body);
+    let forecasts = response.json();
+    let forecasts = forecasts.as_array().expect("array of forecasts");
+    assert_eq!(forecasts.len(), 5);
+    for forecast in forecasts {
+        let date = forecast["date"].as_str().expect("date");
+        assert!(date.len() == 20 && date.ends_with('Z') && date.as_bytes()[10] == b'T', "date: {date}");
+        let c = forecast["temperatureC"].as_i64().expect("temperatureC");
+        assert!((-20..55).contains(&c), "temperatureC: {c}");
+        assert!(forecast["temperatureF"].is_i64());
+        assert!(!forecast["summary"].as_str().expect("summary").is_empty());
+    }
+
     // --- admin-only routes ---
     let response = get(&app, "/user/all", Some(&access)).await;
     assert_eq!(response.status, StatusCode::FORBIDDEN);

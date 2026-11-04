@@ -10,7 +10,7 @@ use utoipa::{
     Modify, OpenApi,
 };
 
-use crate::controllers::{auth_controller, users_controller, ws_controller};
+use crate::controllers::{auth_controller, users_controller, weather_controller, ws_controller};
 
 struct SecuritySchemes;
 
@@ -53,6 +53,7 @@ impl Modify for SecuritySchemes {
         users_controller::get_user_info,
         users_controller::get_all_user_info,
         users_controller::delete_user,
+        weather_controller::get_weather_forecasts,
         ws_controller::ws_docs,
     ),
     components(schemas(
@@ -62,12 +63,14 @@ impl Modify for SecuritySchemes {
         types::user::UserInfo,
         types::auth::AuthErrorBody,
         types::auth::AuthErrorType,
+        types::weather::WeatherForecast,
     )),
     modifiers(&SecuritySchemes),
     tags(
         (name = "auth", description = "Authentication and password reset"),
         (name = "user", description = "User management"),
         (name = "chat", description = "Chat WebSocket"),
+        (name = "WeatherForecasts", description = "Random weather forecasts"),
     )
 )]
 pub struct ApiDoc;
