@@ -9,6 +9,45 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/WeatherForecasts": {
+      "get": {
+        "tags": [
+          "WeatherForecasts"
+        ],
+        "summary": "Retrieves a list of weather forecasts for the next few days.",
+        "operationId": "GetWeatherForecasts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WeatherForecast"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing or invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "tags": [
@@ -600,6 +639,33 @@
             "type": "string"
           }
         }
+      },
+      "WeatherForecast": {
+        "type": "object",
+        "required": [
+          "date",
+          "temperatureC",
+          "temperatureF",
+          "summary"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Forecast date, RFC 3339 (UTC)."
+          },
+          "summary": {
+            "type": "string"
+          },
+          "temperatureC": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "temperatureF": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -629,6 +695,10 @@
     {
       "name": "chat",
       "description": "Chat WebSocket"
+    },
+    {
+      "name": "WeatherForecasts",
+      "description": "Random weather forecasts"
     }
   ]
 }
