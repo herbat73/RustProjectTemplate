@@ -1,0 +1,36 @@
+services:
+
+  postgres:
+    image: postgres:18.3
+    restart: always
+    container_name: postgres_db
+    ports:
+      - 5432:5432
+    volumes:
+      - pgconf:/etc/postgresql
+      - pglog:/var/log/postgresql
+      - pgdata:/var/lib/postgresql
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: rest_db
+      PGDATA: /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U admin -d RestDb'"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - ca-docker-network
+
+networks:
+  ca-docker-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
+  pgconf:
+    driver: local
+  pglog:
+    driver: local
