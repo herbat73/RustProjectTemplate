@@ -10,6 +10,7 @@ use types::auth::{AuthErrorBody, AuthErrorType, AuthToken};
 pub mod auth;
 pub mod user;
 pub mod weather;
+pub mod todo;
 
 static HTTP_CLIENT: OnceCell<Client> = OnceCell::new();
 static BASE_URL: OnceCell<String> = OnceCell::new();
