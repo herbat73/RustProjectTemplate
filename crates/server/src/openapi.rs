@@ -102,4 +102,5 @@ pub fn routes() -> Router {
     Router::new()
         .route("/api-docs/openapi.json", get(|| async { Json(openapi()) }))
         .route("/api-docs", get(|| async { Html(SWAGGER_UI) }))
+        .route("/api-docs/", get(|| async { Html(SWAGGER_UI) }))
 }
