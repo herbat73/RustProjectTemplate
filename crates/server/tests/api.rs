@@ -46,6 +46,10 @@ async fn post_json(app: &Router, uri: &str, value: Value) -> Response {
     send(app, Method::POST, uri, None, Body::from(value.to_string()), true).await
 }
 
+async fn send_json(app: &Router, method: Method, uri: &str, bearer: &str, value: Value) -> Response {
+    send(app, method, uri, Some(bearer), Body::from(value.to_string()), true).await
+}
+
 async fn get(app: &Router, uri: &str, bearer: Option<&str>) -> Response {
     send(app, Method::GET, uri, bearer, Body::empty(), false).await
 }
@@ -204,6 +208,90 @@ async fn api_flow() {
         assert!(!forecast["summary"].as_str().expect("summary").is_empty());
     }
 
+    // --- todo lists and items (token-protected, stored in TodoLists / TodoItems) ---
+    assert_eq!(get(&app, "/api/TodoLists", None).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(get(&app, "/api/TodoLists", Some(&requester)).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(send_json(&app, Method::POST, "/api/TodoItems", &requester, json!({"listId": 1, "title": "x"})).await.status, StatusCode::FORBIDDEN);
+
+    let list_title = format!("list_{suffix}");
+    let response = send_json(&app, Method::POST, "/api/TodoLists", &access, json!({"title": list_title, "colour": "#ff5733"})).await;
+    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
+    let list_id = response.json().as_i64().expect("created list id");
+    let other = send_json(&app, Method::POST, "/api/TodoLists", &access, json!({"title": format!("other_{suffix}")})).await;
+    assert_eq!(other.status, StatusCode::CREATED);
+    let other_id = other.json().as_i64().unwrap();
+
+    // validation
+    assert_eq!(send_json(&app, Method::POST, "/api/TodoLists", &access, json!({"title": "  "})).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(send_json(&app, Method::POST, "/api/TodoLists", &access, json!({"title": "t", "colour": "#123456"})).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(send_json(&app, Method::POST, "/api/TodoItems", &access, json!({"listId": list_id})).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(send_json(&app, Method::POST, "/api/TodoItems", &access, json!({"listId": 2_000_000_000, "title": "x"})).await.status, StatusCode::NOT_FOUND);
+
+    let response = send_json(&app, Method::POST, "/api/TodoItems", &access, json!({"listId": list_id, "title": "first"})).await;
+    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
+    let item_id = response.json().as_i64().expect("created item id");
+
+    // update item: id must match the URL
+    let uri = format!("/api/TodoItems/{item_id}");
+    assert_eq!(send_json(&app, Method::PUT, &uri, &access, json!({"id": item_id + 1, "title": "x", "done": true})).await.status, StatusCode::BAD_REQUEST);
+    let response = send_json(&app, Method::PUT, &uri, &access, json!({"id": item_id, "title": "first (done)", "done": true})).await;
+    assert_eq!(response.status, StatusCode::NO_CONTENT, "body: {}", response.body);
+
+    // update detail: move to the other list, set priority and note
+    let uri_detail = format!("/api/TodoItems/UpdateDetail/{item_id}");
+    assert_eq!(send_json(&app, Method::PATCH, &uri_detail, &access, json!({"id": item_id, "listId": other_id, "priority": 9})).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(send_json(&app, Method::PATCH, &uri_detail, &access, json!({"id": item_id, "listId": 2_000_000_000, "priority": 1})).await.status, StatusCode::NOT_FOUND);
+    let response = send_json(&app, Method::PATCH, &uri_detail, &access, json!({"id": item_id, "listId": other_id, "priority": 3, "note": "remember"})).await;
+    assert_eq!(response.status, StatusCode::NO_CONTENT, "body: {}", response.body);
+
+    let response = get(&app, "/api/TodoLists", Some(&access)).await;
+    assert_eq!(response.status, StatusCode::OK, "body: {}", response.body);
+    let vm = response.json();
+    assert_eq!(vm["priorityLevels"].as_array().unwrap().len(), 4);
+    assert!(vm["colours"].as_array().unwrap().iter().any(|c| c["code"] == "#FF5733"));
+    let lists = vm["lists"].as_array().unwrap();
+    let mine = lists.iter().find(|l| l["id"].as_i64() == Some(list_id)).expect("created list");
+    assert_eq!((mine["title"].as_str(), mine["colour"].as_str()), (Some(list_title.as_str()), Some("#FF5733")));
+    assert!(mine["items"].as_array().unwrap().is_empty(), "item was moved away");
+    let moved = &lists.iter().find(|l| l["id"].as_i64() == Some(other_id)).unwrap()["items"][0];
+    assert_eq!(moved["id"].as_i64(), Some(item_id));
+    assert_eq!(moved["listId"].as_i64(), Some(other_id));
+    assert_eq!((moved["title"].as_str(), moved["done"].as_bool(), moved["priority"].as_i64(), moved["note"].as_str()),
+        (Some("first (done)"), Some(true), Some(3), Some("remember")));
+
+    // update list
+    let uri_list = format!("/api/TodoLists/{list_id}");
+    assert_eq!(send_json(&app, Method::PUT, &uri_list, &access, json!({"id": list_id + 1, "title": "x"})).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(send_json(&app, Method::PUT, &uri_list, &access, json!({"id": list_id, "title": "renamed", "colour": "#6666FF"})).await.status, StatusCode::NO_CONTENT);
+    assert_eq!(send_json(&app, Method::PUT, "/api/TodoLists/2000000000", &access, json!({"id": 2_000_000_000, "title": "x"})).await.status, StatusCode::NOT_FOUND);
+
+    // another user cannot see or touch alice's todos
+    let carol = format!("carol_{suffix}");
+    let response = post_json(&app, "/auth/register", json!({"username": carol, "pass": "pw12345!", "email": format!("{carol}@example.com")})).await;
+    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
+    let carol_access = access_token(&app, response.authorization.as_ref().unwrap()).await;
+    let carol_vm = get(&app, "/api/TodoLists", Some(&carol_access)).await.json();
+    assert!(carol_vm["lists"].as_array().unwrap().is_empty(), "carol sees no lists: {carol_vm}");
+    assert_eq!(send_json(&app, Method::PUT, &uri_list, &carol_access, json!({"id": list_id, "title": "hijack"})).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send(&app, Method::DELETE, &uri_list, Some(&carol_access), Body::empty(), false).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send_json(&app, Method::POST, "/api/TodoItems", &carol_access, json!({"listId": list_id, "title": "x"})).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send_json(&app, Method::PUT, &uri, &carol_access, json!({"id": item_id, "title": "hijack", "done": false})).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send_json(&app, Method::PATCH, &uri_detail, &carol_access, json!({"id": item_id, "listId": list_id, "priority": 1})).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send(&app, Method::DELETE, &uri, Some(&carol_access), Body::empty(), false).await.status, StatusCode::NOT_FOUND);
+    // her own list cannot receive alice's item either
+    let carol_list = send_json(&app, Method::POST, "/api/TodoLists", &carol_access, json!({"title": "carol's"})).await.json().as_i64().unwrap();
+    assert_eq!(send_json(&app, Method::PATCH, &uri_detail, &access, json!({"id": item_id, "listId": carol_list, "priority": 1})).await.status, StatusCode::NOT_FOUND);
+
+    // delete item, then a list with an item: the item goes with it (cascade)
+    assert_eq!(send(&app, Method::DELETE, &uri, Some(&access), Body::empty(), false).await.status, StatusCode::NO_CONTENT);
+    assert_eq!(send(&app, Method::DELETE, &uri, Some(&access), Body::empty(), false).await.status, StatusCode::NOT_FOUND);
+    let response = send_json(&app, Method::POST, "/api/TodoItems", &access, json!({"listId": other_id, "title": "orphan"})).await;
+    let orphan_id = response.json().as_i64().unwrap();
+    for id in [list_id, other_id] {
+        assert_eq!(send(&app, Method::DELETE, &format!("/api/TodoLists/{id}"), Some(&access), Body::empty(), false).await.status, StatusCode::NO_CONTENT);
+    }
+    assert_eq!(send(&app, Method::DELETE, &format!("/api/TodoItems/{orphan_id}"), Some(&access), Body::empty(), false).await.status, StatusCode::NOT_FOUND, "cascade removed the item");
+
     // --- admin-only routes ---
     let response = get(&app, "/user/all", Some(&access)).await;
     assert_eq!(response.status, StatusCode::FORBIDDEN);
@@ -244,6 +332,11 @@ async fn api_flow() {
     assert_eq!(response.json()["error_type"], "UserDoesNotExist");
 
     // --- cleanup ---
+    sqlx::query("DELETE FROM users WHERE username = $1")
+        .bind(&carol)
+        .execute(&server::pool::get_pool())
+        .await
+        .expect("cleanup carol");
     sqlx::query("DELETE FROM users WHERE username = $1")
         .bind(&alice)
         .execute(&server::pool::get_pool())
