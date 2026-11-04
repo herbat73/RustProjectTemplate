@@ -1,0 +1,14 @@
+$kind: http-request
+name: Get Weather Forecasts - No Token
+method: GET
+url: '{{baseUrl}}/api/WeatherForecasts'
+order: 2000
+auth:
+  type: noauth
+scripts:
+  - type: 'http:afterResponse'
+    language: text/javascript
+    code: |-
+      pm.test('missing token is rejected with 403', function () {
+          pm.response.to.have.status(403);
+      });

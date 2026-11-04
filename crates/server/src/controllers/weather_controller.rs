@@ -65,12 +65,37 @@ pub async fn get_weather_forecasts() -> (StatusCode, Json<Vec<WeatherForecast>>)
 
 #[cfg(test)]
 mod tests {
-    use super::rfc3339;
+    use super::{get_weather_forecasts, rfc3339, SUMMARIES};
+    use axum::http::StatusCode;
 
     #[test]
     fn formats_unix_time_as_rfc3339() {
         assert_eq!(rfc3339(0), "1970-01-01T00:00:00Z");
         assert_eq!(rfc3339(951_782_400), "2000-02-29T00:00:00Z"); // leap day
         assert_eq!(rfc3339(1_700_000_000), "2023-11-14T22:13:20Z");
+    }
+
+    #[test]
+    fn formats_end_of_day_and_year_boundaries() {
+        assert_eq!(rfc3339(86_399), "1970-01-01T23:59:59Z");
+        assert_eq!(rfc3339(86_400), "1970-01-02T00:00:00Z");
+        assert_eq!(rfc3339(951_868_800), "2000-03-01T00:00:00Z"); // day after leap day
+    }
+
+    #[tokio::test]
+    async fn handler_returns_five_consecutive_valid_forecasts() {
+        let (status, axum::Json(forecasts)) = get_weather_forecasts().await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(forecasts.len(), 5);
+        for f in &forecasts {
+            assert!((-20..55).contains(&f.temperature_c));
+            assert!(SUMMARIES.contains(&f.summary.as_str()));
+            assert!(f.date.ends_with('Z') && f.date.len() == 20);
+        }
+        let dates: Vec<&str> = forecasts.iter().map(|f| f.date.as_str()).collect();
+        let mut sorted = dates.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(dates, sorted, "dates strictly increasing");
     }
 }

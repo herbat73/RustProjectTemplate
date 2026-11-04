@@ -74,6 +74,23 @@ async fn setup() -> Option<Router> {
     Some(server::app())
 }
 
+/// Decodes the (unverified) payload of a JWT.
+fn jwt_payload(token: &str) -> Value {
+    use base64::prelude::*;
+    let payload = token.split('.').nth(1).expect("JWT payload segment");
+    serde_json::from_slice(&BASE64_URL_SAFE_NO_PAD.decode(payload).expect("base64url payload")).expect("JSON payload")
+}
+
+/// Signs arbitrary claims with the test secret, to forge tokens with bad claims.
+fn forge(claims: Value) -> String {
+    jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &claims,
+        &jsonwebtoken::EncodingKey::from_secret(b"test-secret-test-secret-test-secret"),
+    )
+    .unwrap()
+}
+
 /// Exchanges a requester token for a short-lived access token.
 async fn access_token(app: &Router, requester: &str) -> String {
     let response = get(app, "/auth/request", Some(requester)).await;
@@ -130,6 +147,32 @@ async fn api_flow() {
     assert_eq!(response.status, StatusCode::OK, "body: {}", response.body);
     assert_eq!(response.json()["username"], alice.as_str());
 
+    // both tokens carry the issuer claim, matching the company name
+    for token in [&requester, &access] {
+        let claims = jwt_payload(token);
+        assert_eq!(claims["iss"], "TestCo");
+        assert_eq!(claims["com"], "TestCo");
+        assert_eq!(claims["aud"], "test.example.com");
+    }
+
+    // forged tokens with a wrong / missing issuer or wrong audience are rejected
+    let exp = jsonwebtoken::get_current_timestamp() + 60;
+    let sub = jwt_payload(&access)["sub"].clone();
+    let base = json!({"aud": "test.example.com", "iss": "TestCo", "com": "TestCo", "sub": sub, "exp": exp, "acc": false});
+    assert_eq!(get(&app, "/auth/test", Some(&forge(base.clone()))).await.status, StatusCode::OK, "sanity: forged valid token works");
+    let mut bad_iss = base.clone();
+    bad_iss["iss"] = json!("OtherCo");
+    assert_eq!(get(&app, "/auth/test", Some(&forge(bad_iss))).await.status, StatusCode::FORBIDDEN);
+    let mut no_iss = base.clone();
+    no_iss.as_object_mut().unwrap().remove("iss");
+    assert_eq!(get(&app, "/auth/test", Some(&forge(no_iss))).await.status, StatusCode::FORBIDDEN);
+    let mut bad_aud = base.clone();
+    bad_aud["aud"] = json!("evil.example.com");
+    assert_eq!(get(&app, "/auth/test", Some(&forge(bad_aud))).await.status, StatusCode::FORBIDDEN);
+    let mut expired = base;
+    expired["exp"] = json!(1_000_000);
+    assert_eq!(get(&app, "/auth/test", Some(&forge(expired))).await.status, StatusCode::FORBIDDEN);
+
     // each token type is only accepted where it belongs
     assert_eq!(get(&app, "/auth/request", Some(&access)).await.status, StatusCode::FORBIDDEN, "access token must not work as a requester token");
     assert_eq!(get(&app, "/auth/test", Some(&requester)).await.status, StatusCode::FORBIDDEN, "requester token must not work as an access token");
@@ -156,7 +199,8 @@ async fn api_flow() {
         assert!(date.len() == 20 && date.ends_with('Z') && date.as_bytes()[10] == b'T', "date: {date}");
         let c = forecast["temperatureC"].as_i64().expect("temperatureC");
         assert!((-20..55).contains(&c), "temperatureC: {c}");
-        assert!(forecast["temperatureF"].is_i64());
+        let f = forecast["temperatureF"].as_i64().expect("temperatureF");
+        assert_eq!(f, 32 + (c as f64 / 0.5556) as i64, "temperatureF consistent with temperatureC");
         assert!(!forecast["summary"].as_str().expect("summary").is_empty());
     }
 

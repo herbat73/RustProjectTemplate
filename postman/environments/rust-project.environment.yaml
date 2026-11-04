@@ -1,0 +1,12 @@
+name: RustProject
+values:
+  - key: baseUrl
+    value: 'http://127.0.0.1:3001'
+  - key: username
+    value: adam
+  - key: password
+    value: '12341234'
+  - key: accessToken
+    value: ''
+  - key: requesterToken
+    value: ''

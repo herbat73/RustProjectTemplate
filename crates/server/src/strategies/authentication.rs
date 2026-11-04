@@ -109,6 +109,7 @@ where T: for<'de> Deserialize<'de> {
 #[derive(Debug, Serialize, Deserialize, Iterable)]
 pub struct AuthClaims {
     pub aud: String,
+    pub iss: String,
     pub com: String,
     pub sub: String,
     pub exp: u64,
@@ -123,6 +124,8 @@ impl Claims for AuthClaims {
                 sub: user.uuid,
                 // issuer domain
                 aud: env::var("COMPANY_DOMAIN").unwrap(),
+                // issuer name (must match AUTH validation)
+                iss: env::var("COMPANY_NAME").unwrap(),
                 // issuer company
                 com: env::var("COMPANY_NAME").unwrap(),
                 // expiration timestamp from unix epoch
@@ -156,6 +159,7 @@ where
 #[serde(deny_unknown_fields)]
 pub struct AuthRequesterClaims {
     pub aud: String,
+    pub iss: String,
     pub com: String,
     pub sub: String,
     pub exp: u64
@@ -168,6 +172,8 @@ impl Claims for AuthRequesterClaims {
             sub: uuid,
             // issuer domain
             aud: env::var("COMPANY_DOMAIN").unwrap(),
+            // issuer name (must match AUTH validation)
+            iss: env::var("COMPANY_NAME").unwrap(),
             // issuer company
             com: env::var("COMPANY_NAME").unwrap(),
             // expiration timestamp from unix epoch
