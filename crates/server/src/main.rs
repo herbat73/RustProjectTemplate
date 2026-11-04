@@ -2,7 +2,6 @@ use std::{net::SocketAddr, path::PathBuf};
 
 #[tokio::main]
 async fn main() {
-
     // load environment variables with dotenv if debug
     if cfg!(debug_assertions) {
         match dotenv::dotenv() {
@@ -23,7 +22,7 @@ async fn main() {
     println!("Server listening on http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     match axum::serve(listener, app).await {
-        Ok(_) => {},
-        Err(error) => panic!("Could not bind to {}: {}", addr,error)
+        Ok(_) => {}
+        Err(error) => panic!("Could not bind to {}: {}", addr, error),
     }
 }

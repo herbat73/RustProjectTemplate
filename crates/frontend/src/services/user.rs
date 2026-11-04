@@ -1,11 +1,13 @@
 use reqwest::{Method, StatusCode, Url};
 use types::user::UserInfo;
 
-use super::{get_http_client, AuthRequest};
+use super::{AuthRequest, get_http_client};
 
 pub async fn get_user_info() -> UserInfo {
-    let mut request_builder = AuthRequest::new(get_http_client()
-        .request(Method::GET, Url::parse("http://localhost:3001/user/info").unwrap()));
+    let mut request_builder = AuthRequest::new(get_http_client().request(
+        Method::GET,
+        Url::parse("http://localhost:3001/user/info").unwrap(),
+    ));
 
     // Request user info from server
     let request_result = request_builder.send().await;
@@ -14,7 +16,7 @@ pub async fn get_user_info() -> UserInfo {
     }
 
     let response = request_result.unwrap();
-    
+
     // Parse response body as JSON
     let json_result = response.json::<UserInfo>().await;
     if let Err(_) = json_result {
@@ -27,12 +29,14 @@ pub async fn get_user_info() -> UserInfo {
 }
 
 pub async fn get_all_users() -> Result<(StatusCode, Vec<UserInfo>), StatusCode> {
-    let mut request_result = AuthRequest::new(get_http_client()
-        .request(Method::GET, Url::parse("http://localhost:3001/user/all").unwrap()));
+    let mut request_result = AuthRequest::new(get_http_client().request(
+        Method::GET,
+        Url::parse("http://localhost:3001/user/all").unwrap(),
+    ));
     // Unwrap request and extract status as owned value
     let response = request_result.send().await;
     if let Err(_) = response {
-        return Err(StatusCode::UNAUTHORIZED)
+        return Err(StatusCode::UNAUTHORIZED);
     }
     let response = response.unwrap();
     let status = response.status();
@@ -49,9 +53,11 @@ pub async fn get_all_users() -> Result<(StatusCode, Vec<UserInfo>), StatusCode> 
 }
 
 pub async fn delete_user(uuid: String) -> Result<StatusCode, StatusCode> {
-    let mut request = AuthRequest::new(get_http_client()
-    .delete("http://localhost:3001/user")
-    .body(uuid));
+    let mut request = AuthRequest::new(
+        get_http_client()
+            .delete("http://localhost:3001/user")
+            .body(uuid),
+    );
     // Request to delete user with uuid
     let request_result = request.send().await;
     if let Err(_) = request_result {

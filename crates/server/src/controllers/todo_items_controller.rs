@@ -1,19 +1,24 @@
 use axum::{
+    Router,
     extract::{Json, Path},
     http::{HeaderMap, StatusCode},
     middleware,
     routing::{patch, post, put},
-    Router,
 };
 use types::{
     auth::{AuthErrorBody, AuthErrorType},
-    todo::{CreateTodoItemCommand, UpdateTodoItemCommand, UpdateTodoItemDetailCommand, PRIORITY_LEVELS},
+    todo::{
+        CreateTodoItemCommand, PRIORITY_LEVELS, UpdateTodoItemCommand, UpdateTodoItemDetailCommand,
+    },
 };
 
 use super::todo_lists_controller::{current_user_id, validate_title};
 use crate::{
     middleware::token_authentication,
-    strategies::{authentication::{AuthClaims, AuthError}, todo},
+    strategies::{
+        authentication::{AuthClaims, AuthError},
+        todo,
+    },
 };
 
 pub fn routes() -> Router {
@@ -21,7 +26,9 @@ pub fn routes() -> Router {
         .route("/", post(create_todo_item))
         .route("/{id}", put(update_todo_item).delete(delete_todo_item))
         .route("/UpdateDetail/{id}", patch(update_todo_item_detail))
-        .layer(middleware::from_fn(token_authentication::authenticate_token::<AuthClaims>))
+        .layer(middleware::from_fn(
+            token_authentication::authenticate_token::<AuthClaims>,
+        ))
 }
 
 fn db_error(error: sqlx::Error) -> AuthError {
@@ -49,13 +56,21 @@ fn not_found() -> AuthError {
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn create_todo_item(headers: HeaderMap, Json(command): Json<CreateTodoItemCommand>) -> Result<(StatusCode, Json<i32>), AuthError> {
+pub async fn create_todo_item(
+    headers: HeaderMap,
+    Json(command): Json<CreateTodoItemCommand>,
+) -> Result<(StatusCode, Json<i32>), AuthError> {
     let user_id = current_user_id(&headers).await?;
     let title = validate_title(command.title)?;
-    if !todo::list_exists(user_id, command.list_id).await.map_err(db_error)? {
+    if !todo::list_exists(user_id, command.list_id)
+        .await
+        .map_err(db_error)?
+    {
         return Err(not_found());
     }
-    let id = todo::insert_item(command.list_id, title).await.map_err(db_error)?;
+    let id = todo::insert_item(command.list_id, title)
+        .await
+        .map_err(db_error)?;
     Ok((StatusCode::CREATED, Json(id)))
 }
 
@@ -76,13 +91,20 @@ pub async fn create_todo_item(headers: HeaderMap, Json(command): Json<CreateTodo
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn update_todo_item(headers: HeaderMap, Path(id): Path<i32>, Json(command): Json<UpdateTodoItemCommand>) -> Result<StatusCode, AuthError> {
+pub async fn update_todo_item(
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+    Json(command): Json<UpdateTodoItemCommand>,
+) -> Result<StatusCode, AuthError> {
     if id != command.id {
         return Err(AuthError::from_error_type(AuthErrorType::BadRequest));
     }
     let title = validate_title(command.title)?;
     let user_id = current_user_id(&headers).await?;
-    if todo::update_item(user_id, id, title, command.done).await.map_err(db_error)? {
+    if todo::update_item(user_id, id, title, command.done)
+        .await
+        .map_err(db_error)?
+    {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(not_found())
@@ -106,15 +128,29 @@ pub async fn update_todo_item(headers: HeaderMap, Path(id): Path<i32>, Json(comm
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn update_todo_item_detail(headers: HeaderMap, Path(id): Path<i32>, Json(command): Json<UpdateTodoItemDetailCommand>) -> Result<StatusCode, AuthError> {
-    if id != command.id || !PRIORITY_LEVELS.iter().any(|(level, _)| *level == command.priority) {
+pub async fn update_todo_item_detail(
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+    Json(command): Json<UpdateTodoItemDetailCommand>,
+) -> Result<StatusCode, AuthError> {
+    if id != command.id
+        || !PRIORITY_LEVELS
+            .iter()
+            .any(|(level, _)| *level == command.priority)
+    {
         return Err(AuthError::from_error_type(AuthErrorType::BadRequest));
     }
     let user_id = current_user_id(&headers).await?;
-    if !todo::list_exists(user_id, command.list_id).await.map_err(db_error)? {
+    if !todo::list_exists(user_id, command.list_id)
+        .await
+        .map_err(db_error)?
+    {
         return Err(not_found());
     }
-    if todo::update_item_detail(user_id, id, command.list_id, command.priority, command.note).await.map_err(db_error)? {
+    if todo::update_item_detail(user_id, id, command.list_id, command.priority, command.note)
+        .await
+        .map_err(db_error)?
+    {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(not_found())
@@ -136,7 +172,10 @@ pub async fn update_todo_item_detail(headers: HeaderMap, Path(id): Path<i32>, Js
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn delete_todo_item(headers: HeaderMap, Path(id): Path<i32>) -> Result<StatusCode, AuthError> {
+pub async fn delete_todo_item(
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, AuthError> {
     let user_id = current_user_id(&headers).await?;
     if todo::delete_item(user_id, id).await.map_err(db_error)? {
         Ok(StatusCode::NO_CONTENT)

@@ -3,14 +3,16 @@ use std::{env, str::FromStr};
 use gloo_console::error;
 use gloo_storage::{Storage, errors::StorageError};
 use once_cell::sync::OnceCell;
-use reqwest::{header::{HeaderMap, AUTHORIZATION}, Client, RequestBuilder, Response, StatusCode};
+use reqwest::{
+    Client, RequestBuilder, Response, StatusCode,
+    header::{AUTHORIZATION, HeaderMap},
+};
 use types::auth::{AuthErrorBody, AuthErrorType, AuthToken};
 
-
 pub mod auth;
+pub mod todo;
 pub mod user;
 pub mod weather;
-pub mod todo;
 
 static HTTP_CLIENT: OnceCell<Client> = OnceCell::new();
 static BASE_URL: OnceCell<String> = OnceCell::new();
@@ -18,9 +20,7 @@ static BASE_URL: OnceCell<String> = OnceCell::new();
 pub fn create_http_clients() {
     let base_url = env::var("BASE_URL").unwrap_or("http://localhost:3001".to_string());
     BASE_URL.set(base_url).unwrap();
-    HTTP_CLIENT.set(Client::builder()
-    .build()
-    .unwrap()).unwrap();
+    HTTP_CLIENT.set(Client::builder().build().unwrap()).unwrap();
 }
 
 pub fn get_http_client() -> Client {
@@ -33,7 +33,7 @@ pub fn get_base_url() -> String {
 #[derive(Debug)]
 pub struct AuthRequest {
     token: AuthToken,
-    request_builder: RequestBuilder
+    request_builder: RequestBuilder,
 }
 
 impl AuthRequest {
@@ -44,17 +44,17 @@ impl AuthRequest {
         }
         return Self {
             token: token.unwrap(),
-            request_builder
-        }
+            request_builder,
+        };
     }
     async fn request_auth_token() -> Result<StatusCode, AuthError> {
         // Build auth header from token
         let auth_token_result = AuthStorage::get_requester_token();
         if let Err(_) = &auth_token_result {
-            return Err(AuthError::from_error_type(AuthErrorType::InvalidToken))
+            return Err(AuthError::from_error_type(AuthErrorType::InvalidToken));
         }
         let auth_token = auth_token_result.unwrap();
-    
+
         // Build request for retrieving valid token with access information
         let request_builder = get_http_client()
             .get(get_base_url() + "/auth/request")
@@ -64,18 +64,18 @@ impl AuthRequest {
             error!("Error with request: {}", error.to_string());
             return Err(AuthError::default());
         }
-    
+
         // Unwrap response from request_result
         let response = request_result.unwrap();
-    
+
         // Get status and match for responsive behavior
         let status = response.status();
-    
+
         // Check if status is success
         if !status.is_success() {
             return Err(AuthError::from_response(response).await);
         }
-    
+
         // Extract auth header from headers
         let headers = response.headers();
         let auth_header_result = headers.get(AUTHORIZATION);
@@ -84,12 +84,12 @@ impl AuthRequest {
         }
         let header = auth_header_result.unwrap();
         let header_str = header.to_str().unwrap_or("");
-    
+
         // Store auth token
         AuthStorage::store_auth_token(AuthToken::from_string(header_str.to_string()));
         Ok(status)
     }
-    
+
     async fn refresh_token(&mut self) -> Result<(), AuthError> {
         let auth_request_result = AuthRequest::request_auth_token().await;
         if let Err(auth_error) = auth_request_result {
@@ -107,9 +107,13 @@ impl AuthRequest {
         if let Err(refresh_error) = refresh_result {
             return Err(refresh_error);
         }
-        let response  = self.request_builder.try_clone().unwrap()
+        let response = self
+            .request_builder
+            .try_clone()
+            .unwrap()
             .bearer_auth(self.token.clone().to_string())
-            .send().await;
+            .send()
+            .await;
         if let Err(_error) = response {
             return Err(AuthError::from_error_type(AuthErrorType::BadRequest));
         }
@@ -126,21 +130,22 @@ impl AuthStorage {
         gloo_storage::LocalStorage::set(token_key, token_string).unwrap();
     }
     fn store_from_headers(headers: &HeaderMap) {
-        headers.get_all(AUTHORIZATION).into_iter().for_each(|header| {
-            let header_str_result = header.to_str();
-            if let Err(error) = &header_str_result {
-                error!("Error converting header to str: {}", error.to_string());
-            }
-            let header_str = header_str_result.unwrap();
-            AuthStorage::store_requester_token(AuthToken::from_string(header_str.to_string()));
-        });
+        headers
+            .get_all(AUTHORIZATION)
+            .into_iter()
+            .for_each(|header| {
+                let header_str_result = header.to_str();
+                if let Err(error) = &header_str_result {
+                    error!("Error converting header to str: {}", error.to_string());
+                }
+                let header_str = header_str_result.unwrap();
+                AuthStorage::store_requester_token(AuthToken::from_string(header_str.to_string()));
+            });
     }
-    fn get(token_key: &str) -> Result<AuthToken, StorageError>  {
+    fn get(token_key: &str) -> Result<AuthToken, StorageError> {
         match gloo_storage::LocalStorage::get(token_key) {
-            Ok(token_string) => {
-                Ok(AuthToken::from_string(token_string))
-            },
-            Err(storage_error) => Err(storage_error)
+            Ok(token_string) => Ok(AuthToken::from_string(token_string)),
+            Err(storage_error) => Err(storage_error),
         }
     }
     pub fn clear() {
@@ -170,19 +175,19 @@ impl AuthError {
         let error_body = response.json::<AuthErrorBody>().await;
         if let Err(_) = error_body {
             return Self {
-                0: types::auth::AuthError::default()
-            }
+                0: types::auth::AuthError::default(),
+            };
         }
-        return Self  {
+        return Self {
             0: types::auth::AuthError {
                 status: http::StatusCode::from_str(status.as_str()).unwrap(),
-                body: error_body.unwrap()
-            }
+                body: error_body.unwrap(),
+            },
         };
     }
     pub fn from_error_type(error_type: AuthErrorType) -> Self {
         Self {
-            0: types::auth::AuthError::from_error_type(error_type)
+            0: types::auth::AuthError::from_error_type(error_type),
         }
     }
     pub fn body(&self) -> AuthErrorBody {
@@ -190,7 +195,7 @@ impl AuthError {
     }
     pub fn default() -> Self {
         Self {
-            0: types::auth::AuthError::default()
+            0: types::auth::AuthError::default(),
         }
     }
 }

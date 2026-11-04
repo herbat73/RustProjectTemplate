@@ -1,28 +1,29 @@
+use axum::{Router, routing::get};
+use axum::{
+    extract::{
+        State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
+    response::IntoResponse,
+};
+use futures::{sink::SinkExt, stream::StreamExt};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
-use axum::{
-    routing::get,
-    Router
-};
-use axum::{
-    extract::{ws::{Message, WebSocket, WebSocketUpgrade}, State}, response::IntoResponse
-};
 use tokio::sync::broadcast;
-use futures::{sink::SinkExt, stream::StreamExt};
 
 use crate::strategies::authentication::{AuthRequesterClaims, Claims};
 use crate::strategies::users::get_db_user_by_uuid;
 
 struct AppState {
     user_set: Mutex<HashSet<String>>,
-    tx: broadcast::Sender<String>
+    tx: broadcast::Sender<String>,
 }
 
 // route function to nest endpoints in router
 pub fn routes() -> Router {
     let user_set = Mutex::new(HashSet::new());
     let (tx, _rx) = broadcast::channel(100);
-    let app_state = Arc::new(AppState{user_set, tx});
+    let app_state = Arc::new(AppState { user_set, tx });
     // create routes
     Router::new()
         .route("/", get(ws_handler))
@@ -44,7 +45,7 @@ pub fn routes() -> Router {
 pub fn ws_docs() {}
 
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    ws.on_upgrade(|socket| {handle_socket(socket, state)})
+    ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
 async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
@@ -53,7 +54,10 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     while let Some(Ok(auth)) = receiver.next().await {
         if let Message::Text(text) = auth {
             if let Ok(claims) = AuthRequesterClaims::from_string(&text) {
-                username = get_db_user_by_uuid(claims.sub.clone()).await.unwrap().username;
+                username = get_db_user_by_uuid(claims.sub.clone())
+                    .await
+                    .unwrap()
+                    .username;
                 break;
             } else {
                 sender.close().await.unwrap();

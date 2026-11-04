@@ -3,12 +3,12 @@ use gloo_console::{error, log};
 use reqwest::StatusCode;
 use types::user::{LoginUser, RegisterUser, ResetUser, UserInfo};
 
-use super::{get_base_url, get_http_client, AuthError, AuthRequest, AuthStorage};
+use super::{AuthError, AuthRequest, AuthStorage, get_base_url, get_http_client};
 
 pub async fn test_auth_route() -> Result<StatusCode, AuthError> {
-    let request_result = AuthRequest::new(
-        get_http_client().get(get_base_url() + "/auth/test")
-    ).send().await;
+    let request_result = AuthRequest::new(get_http_client().get(get_base_url() + "/auth/test"))
+        .send()
+        .await;
     // Send request to test auth route
     if let Err(_) = request_result {
         return Err(AuthError::default());
@@ -39,7 +39,8 @@ pub async fn register_user(user: RegisterUser) -> Result<UserInfo, AuthError> {
     let request_result = get_http_client()
         .post(get_base_url() + "/auth/register")
         .json(&user)
-        .send().await;
+        .send()
+        .await;
     if let Err(error) = request_result {
         error!("Error with request: {}", error.to_string());
         return Err(AuthError::default());
@@ -70,9 +71,13 @@ pub async fn register_user(user: RegisterUser) -> Result<UserInfo, AuthError> {
     return Ok(data);
 }
 
-pub async fn login_user(user: LoginUser) -> Result<UserInfo, AuthError>  {
+pub async fn login_user(user: LoginUser) -> Result<UserInfo, AuthError> {
     // Send login data to server
-    let request_result = get_http_client().post(get_base_url() + "/auth/login").json(&user).send().await;
+    let request_result = get_http_client()
+        .post(get_base_url() + "/auth/login")
+        .json(&user)
+        .send()
+        .await;
     if let Err(error) = request_result {
         error!(format!("Error with request: {}", error.to_string()));
         return Err(AuthError::default());
@@ -103,7 +108,11 @@ pub async fn login_user(user: LoginUser) -> Result<UserInfo, AuthError>  {
 }
 
 pub async fn reset_user(user: ResetUser, key: String) -> Result<StatusCode, AuthError> {
-    let request_result = get_http_client().post(get_base_url() + &format!("/auth/reset/{key}")).json(&user).send().await;
+    let request_result = get_http_client()
+        .post(get_base_url() + &format!("/auth/reset/{key}"))
+        .json(&user)
+        .send()
+        .await;
     if let Err(error) = request_result {
         error!(format!("Error with request: {}", error.to_string()));
         return Err(AuthError::default());
@@ -124,7 +133,11 @@ pub async fn reset_user(user: ResetUser, key: String) -> Result<StatusCode, Auth
 }
 
 pub async fn request_reset(email: String) -> Result<StatusCode, AuthError> {
-    let request_result = get_http_client().post(get_base_url() + "/auth/reset").body(email).send().await;
+    let request_result = get_http_client()
+        .post(get_base_url() + "/auth/reset")
+        .body(email)
+        .send()
+        .await;
     if let Err(error) = request_result {
         error!(format!("Error with request: {}", error.to_string()));
         return Err(AuthError::default());

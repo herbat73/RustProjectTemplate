@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::app::AppRoute;
-use crate::hooks::{use_user_info, USER_INFO};
+use crate::hooks::{USER_INFO, use_user_info};
 
 #[component]
 pub fn AdminRoute(children: Element) -> Element {

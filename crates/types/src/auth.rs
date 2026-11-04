@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AuthToken {
     pub access_token: String,
-    pub token_type: String
+    pub token_type: String,
 }
 
 impl AuthToken {
@@ -17,7 +17,7 @@ impl AuthToken {
     pub fn from_string(string: String) -> Self {
         AuthToken {
             token_type: "Bearer".to_string(),
-            access_token: string
+            access_token: string,
         }
     }
     pub fn to_string(self: AuthToken) -> String {
@@ -26,16 +26,15 @@ impl AuthToken {
     pub fn default() -> Self {
         Self {
             access_token: String::new(),
-            token_type: String::new()
+            token_type: String::new(),
         }
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct AuthError {
     pub status: StatusCode,
-    pub body: AuthErrorBody
+    pub body: AuthErrorBody,
 }
 
 impl AuthError {
@@ -44,32 +43,57 @@ impl AuthError {
             status: StatusCode::SERVICE_UNAVAILABLE,
             body: AuthErrorBody {
                 error_type: AuthErrorType::ServerError,
-                message: String::from("Generic auth error")
-            }
+                message: String::from("Generic auth error"),
+            },
         }
     }
     pub fn from_error_type(error_type: AuthErrorType) -> Self {
         let (status, message) = match error_type {
-            AuthErrorType::WrongCredentials => (StatusCode::UNAUTHORIZED, String::from("Wrong credentials")),
-            AuthErrorType::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, String::from("Token creation error")),
-            AuthErrorType::ServerError => (StatusCode::INTERNAL_SERVER_ERROR, String::from("Server error")),
-            AuthErrorType::UserAlreadyExists => (StatusCode::CONFLICT, String::from("Username or email taken")),
-            AuthErrorType::UserDoesNotExist => (StatusCode::NOT_FOUND, String::from("User does not exist")),
+            AuthErrorType::WrongCredentials => {
+                (StatusCode::UNAUTHORIZED, String::from("Wrong credentials"))
+            }
+            AuthErrorType::TokenCreation => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                String::from("Token creation error"),
+            ),
+            AuthErrorType::ServerError => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                String::from("Server error"),
+            ),
+            AuthErrorType::UserAlreadyExists => (
+                StatusCode::CONFLICT,
+                String::from("Username or email taken"),
+            ),
+            AuthErrorType::UserDoesNotExist => {
+                (StatusCode::NOT_FOUND, String::from("User does not exist"))
+            }
             AuthErrorType::InvalidToken => (StatusCode::FORBIDDEN, String::from("Invalid token")),
             AuthErrorType::AccessDenied => (StatusCode::FORBIDDEN, String::from("Access denied")),
-            AuthErrorType::MissingFields => (StatusCode::BAD_REQUEST, String::from("Missing required fields")),
+            AuthErrorType::MissingFields => (
+                StatusCode::BAD_REQUEST,
+                String::from("Missing required fields"),
+            ),
             AuthErrorType::BadRequest => (StatusCode::BAD_REQUEST, String::from("Bad request")),
-            AuthErrorType::InvalidEmail => (StatusCode::BAD_REQUEST, String::from("Email address is invalid")),
-            AuthErrorType::ResetLinkInvalid => (StatusCode::BAD_REQUEST, String::from("Reset link is invalid")),
+            AuthErrorType::InvalidEmail => (
+                StatusCode::BAD_REQUEST,
+                String::from("Email address is invalid"),
+            ),
+            AuthErrorType::ResetLinkInvalid => (
+                StatusCode::BAD_REQUEST,
+                String::from("Reset link is invalid"),
+            ),
             AuthErrorType::NotFound => (StatusCode::NOT_FOUND, String::from("Resource not found")),
-            AuthErrorType::PasswordDoesNotMatch => (StatusCode::BAD_REQUEST, String::from("Password does not match")),
+            AuthErrorType::PasswordDoesNotMatch => (
+                StatusCode::BAD_REQUEST,
+                String::from("Password does not match"),
+            ),
         };
         Self {
             status,
             body: AuthErrorBody {
                 error_type,
-                message
-            }
+                message,
+            },
         }
     }
     pub fn body(&self) -> AuthErrorBody {
@@ -95,12 +119,12 @@ pub enum AuthErrorType {
     InvalidEmail,
     ResetLinkInvalid,
     PasswordDoesNotMatch,
-    NotFound
+    NotFound,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AuthErrorBody {
     pub error_type: AuthErrorType,
-    pub message: String
+    pub message: String,
 }

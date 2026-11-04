@@ -1,6 +1,5 @@
 use std::env;
 
-
 #[cfg(not(any(
     all(feature = "postgres", any(feature = "sqlite")),
     all(feature = "sqlite", any(feature = "postgres")),
@@ -17,10 +16,13 @@ use once_cell::sync::OnceCell;
     all(feature = "postgres", any(feature = "sqlite")),
     all(feature = "sqlite", any(feature = "postgres")),
 ))]
-use sqlx::{any::Any, Pool};
+use sqlx::{Pool, any::Any};
 
 #[cfg(not(any(feature = "postgres", feature = "sqlite")))]
-use sqlx::{any::{Any, AnyPoolOptions}, Pool};
+use sqlx::{
+    Pool,
+    any::{Any, AnyPoolOptions},
+};
 
 #[cfg(all(feature = "postgres", not(feature = "sqlite")))]
 use sqlx::{PgPool, postgres::PgPoolOptions};
@@ -41,7 +43,6 @@ static POOL: OnceCell<SqlitePool> = OnceCell::new();
 
 // function for initializing the POOL singleton
 pub async fn create_pool() {
-
     let database_url = match env::var("DATABASE_URL") {
         Ok(url) => url,
         Err(error) => {
@@ -65,15 +66,17 @@ async fn init_pool(database_url: String) {
     let pool = match AnyPoolOptions::new()
         .max_connections(100)
         .idle_timeout(Some(Duration::from_millis(1000)))
-        .connect(&database_url).await {
-            Ok(pool) => {
-                println!("Created SQL pool from DB url");
-                pool
-            },
-            Err(error) => {
-                panic!("Could not create pool: {}", error);
-            }
-        };
+        .connect(&database_url)
+        .await
+    {
+        Ok(pool) => {
+            println!("Created SQL pool from DB url");
+            pool
+        }
+        Err(error) => {
+            panic!("Could not create pool: {}", error);
+        }
+    };
     POOL.set(pool).unwrap();
 }
 
@@ -82,15 +85,17 @@ async fn init_pool(database_url: String) {
     let pool = match PgPoolOptions::new()
         .max_connections(100)
         .idle_timeout(Some(Duration::from_millis(1000)))
-        .connect(&database_url).await {
-            Ok(pool) => {
-                println!("Created postgresql pool");
-                pool
-            },
-            Err(error) => {
-                panic!("Could not create pool: {}", error);
-            }
-        };
+        .connect(&database_url)
+        .await
+    {
+        Ok(pool) => {
+            println!("Created postgresql pool");
+            pool
+        }
+        Err(error) => {
+            panic!("Could not create pool: {}", error);
+        }
+    };
     POOL.set(pool).unwrap();
 }
 
@@ -99,15 +104,17 @@ async fn init_pool(database_url: String) {
     let pool = match SqlitePoolOptions::new()
         .max_connections(100)
         .idle_timeout(Some(Duration::from_millis(1000)))
-        .connect(&database_url).await {
-            Ok(pool) => {
-                println!("Created sqlite pool");
-                pool
-            },
-            Err(error) => {
-                panic!("Could not create pool: {}", error);
-            }
-        };
+        .connect(&database_url)
+        .await
+    {
+        Ok(pool) => {
+            println!("Created sqlite pool");
+            pool
+        }
+        Err(error) => {
+            panic!("Could not create pool: {}", error);
+        }
+    };
     POOL.set(pool).unwrap();
 }
 
