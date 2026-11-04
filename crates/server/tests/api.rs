@@ -200,7 +200,7 @@ async fn api_flow() {
         let c = forecast["temperatureC"].as_i64().expect("temperatureC");
         assert!((-20..55).contains(&c), "temperatureC: {c}");
         let f = forecast["temperatureF"].as_i64().expect("temperatureF");
-        assert_eq!(f, 32 + (c as f64 / 0.5556) as i64, "temperatureF consistent with temperatureC");
+        assert_eq!(f, (c as f64 * 9.0 / 5.0).round() as i64 + 32, "temperatureF consistent with temperatureC");
         assert!(!forecast["summary"].as_str().expect("summary").is_empty());
     }
 
