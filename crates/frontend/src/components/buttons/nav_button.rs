@@ -8,7 +8,11 @@ pub fn NavButton(
     destination: AppRoute,
     #[props(default = false)] disabled: bool,
 ) -> Element {
-    let disabled_class = if disabled { "pointer-events-none opacity-50" } else { "" };
+    let disabled_class = if disabled {
+        "pointer-events-none opacity-50"
+    } else {
+        ""
+    };
 
     rsx! {
         Link { to: destination,

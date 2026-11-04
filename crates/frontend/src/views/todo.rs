@@ -1,9 +1,7 @@
 use dioxus::prelude::*;
 use types::todo::TodoListDto;
 
-use crate::components::{
-    buttons::button::Button, error_message::ErrorMessage, input::Input,
-};
+use crate::components::{buttons::button::Button, error_message::ErrorMessage, input::Input};
 use crate::services::{self, AuthError};
 
 #[component]
@@ -26,14 +24,15 @@ pub fn Todo() -> Element {
     use_hook(refresh);
 
     // Runs a mutation, then reloads the lists (or shows the error).
-    let run = move |fut: std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), AuthError>>>>| {
-        spawn(async move {
-            match fut.await {
-                Ok(()) => refresh(),
-                Err(error) => error_state.set(Some(error)),
-            }
-        });
-    };
+    let run =
+        move |fut: std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), AuthError>>>>| {
+            spawn(async move {
+                match fut.await {
+                    Ok(()) => refresh(),
+                    Err(error) => error_state.set(Some(error)),
+                }
+            });
+        };
 
     rsx! {
         div { class: "col-span-12 row-span-24 flex flex-col items-center h-full space-y-2 overflow-y-auto",

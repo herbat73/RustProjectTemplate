@@ -21,9 +21,18 @@ pub fn app() -> Router {
         .nest("/ws", controllers::ws_controller::routes())
         .nest("/auth", controllers::auth_controller::routes())
         .nest("/user", controllers::users_controller::routes())
-        .nest("/api/WeatherForecasts", controllers::weather_controller::routes())
-        .nest("/api/TodoItems", controllers::todo_items_controller::routes())
-        .nest("/api/TodoLists", controllers::todo_lists_controller::routes())
+        .nest(
+            "/api/WeatherForecasts",
+            controllers::weather_controller::routes(),
+        )
+        .nest(
+            "/api/TodoItems",
+            controllers::todo_items_controller::routes(),
+        )
+        .nest(
+            "/api/TodoLists",
+            controllers::todo_lists_controller::routes(),
+        )
         .merge(openapi::routes())
         .layer(ServiceBuilder::new().layer(cors))
 }

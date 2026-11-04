@@ -1,14 +1,23 @@
-use std::env;
-use axum::{body::Body, extract::FromRequestParts, http::request::Parts, response::{IntoResponse, Response}, Json, RequestPartsExt};
-use axum_extra::{headers::{Authorization, authorization::Bearer}, TypedHeader};
+use axum::{
+    Json, RequestPartsExt,
+    body::Body,
+    extract::FromRequestParts,
+    http::request::Parts,
+    response::{IntoResponse, Response},
+};
+use axum_extra::{
+    TypedHeader,
+    headers::{Authorization, authorization::Bearer},
+};
+use base64::prelude::*;
 use http::{HeaderMap, StatusCode};
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use types::auth::{AuthErrorBody, AuthErrorType, AuthToken};
+use std::env;
 use struct_iterable::Iterable;
-use base64::prelude::*;
+use types::auth::{AuthErrorBody, AuthErrorType, AuthToken};
 
 use super::users::get_db_user_by_uuid;
 
@@ -20,28 +29,36 @@ static KEYS: Lazy<Keys> = Lazy::new(|| {
 
 // Auth token lifetime
 static TOKEN_LIFETIME: Lazy<u64> = Lazy::new(|| {
-    u64::from_str_radix(env::var("AUTH_TOKEN_EXPIRE")
-        .expect("AUTH_TOKEN_EXPIRE must be configured").as_str(), 10)
-        .expect("Cannot parse AUTH_TOKEN_EXPIRE as u64")
+    u64::from_str_radix(
+        env::var("AUTH_TOKEN_EXPIRE")
+            .expect("AUTH_TOKEN_EXPIRE must be configured")
+            .as_str(),
+        10,
+    )
+    .expect("Cannot parse AUTH_TOKEN_EXPIRE as u64")
 });
 
 // Auth request token lifetime
 static TOKEN_REQUESTER_LIFETIME: Lazy<u64> = Lazy::new(|| {
-    u64::from_str_radix(env::var("AUTH_REQUEST_TOKEN_EXPIRE")
-        .expect("AUTH_REQUEST_TOKEN_EXPIRE must be configured").as_str(), 10)
-        .expect("Cannot parse AUTH_REQUEST_TOKEN_EXPIRE as u64")
+    u64::from_str_radix(
+        env::var("AUTH_REQUEST_TOKEN_EXPIRE")
+            .expect("AUTH_REQUEST_TOKEN_EXPIRE must be configured")
+            .as_str(),
+        10,
+    )
+    .expect("Cannot parse AUTH_REQUEST_TOKEN_EXPIRE as u64")
 });
 
 struct Keys {
     encoding: EncodingKey,
-    decoding: DecodingKey
+    decoding: DecodingKey,
 }
 
 impl Keys {
     fn new(secret: &[u8]) -> Self {
         Self {
             encoding: EncodingKey::from_secret(secret),
-            decoding: DecodingKey::from_secret(secret)
+            decoding: DecodingKey::from_secret(secret),
         }
     }
 }
@@ -49,14 +66,16 @@ impl Keys {
 // trait for JWT claims
 pub trait Claims {
     // create claim from UUID
-    fn new(uuid: String) -> impl std::future::Future<Output = Result<Self, AuthError>> + Send where Self: Sized;
+    fn new(uuid: String) -> impl std::future::Future<Output = Result<Self, AuthError>> + Send
+    where
+        Self: Sized;
     // generate AuthToken from Claims
     fn generate_token(&self) -> Result<AuthToken, AuthError>
-    where Self: Serialize {
+    where
+        Self: Serialize,
+    {
         match encode(&Header::default(), &self, &KEYS.encoding) {
-            Ok(encoded_string) => {
-                Ok(AuthToken::new(encoded_string))
-            },
+            Ok(encoded_string) => Ok(AuthToken::new(encoded_string)),
             Err(error) => {
                 println!("Error creating token: {}", error);
                 Err(AuthError::from_error_type(AuthErrorType::TokenCreation))
@@ -65,30 +84,36 @@ pub trait Claims {
     }
     // generate claims from X-Claims header
     fn from_header(headers: &HeaderMap) -> Self
-    where Self: for<'de> Deserialize<'de> {
+    where
+        Self: for<'de> Deserialize<'de>,
+    {
         let value = headers.get("X-Claims").unwrap();
-        return serde_json::from_str(&String::from_utf8(BASE64_STANDARD.decode(value).unwrap()).unwrap()).unwrap();
+        return serde_json::from_str(
+            &String::from_utf8(BASE64_STANDARD.decode(value).unwrap()).unwrap(),
+        )
+        .unwrap();
     }
     fn from_string(encoded_str: &str) -> Result<Self, AuthError>
-    where Self: Sized,Self: for<'de> Deserialize<'de> {
+    where
+        Self: Sized,
+        Self: for<'de> Deserialize<'de>,
+    {
         let mut validation = Validation::new(Algorithm::HS256);
         validation.leeway = 5;
         validation.set_audience(&[env::var("COMPANY_DOMAIN").unwrap()]);
         validation.set_issuer(&[env::var("COMPANY_NAME").unwrap()]);
         match decode::<Self>(encoded_str, &KEYS.decoding, &validation) {
-            Ok(claims) => {
-                Ok(claims.claims)
-            },
-            Err(_) => {
-                Err(AuthError::from_error_type(AuthErrorType::InvalidToken))
-            }
+            Ok(claims) => Ok(claims.claims),
+            Err(_) => Err(AuthError::from_error_type(AuthErrorType::InvalidToken)),
         }
     }
 }
 
 // build claims from request Authorization header
 async fn claims_from_request<T>(parts: &mut Parts) -> Result<T, AuthError>
-where T: for<'de> Deserialize<'de> {
+where
+    T: for<'de> Deserialize<'de>,
+{
     // Extract the token from the authorization header
     let TypedHeader(Authorization(bearer)) = parts
         .extract::<TypedHeader<Authorization<Bearer>>>()
@@ -101,7 +126,7 @@ where T: for<'de> Deserialize<'de> {
     validation.set_issuer(&[env::var("COMPANY_NAME").unwrap()]);
     // Decode the user data
     let token_data = decode::<T>(bearer.token(), &KEYS.decoding, &validation)
-    .map_err(|_| AuthError::from_error_type(AuthErrorType::InvalidToken))?;
+        .map_err(|_| AuthError::from_error_type(AuthErrorType::InvalidToken))?;
     Ok(token_data.claims)
 }
 
@@ -113,7 +138,7 @@ pub struct AuthClaims {
     pub com: String,
     pub sub: String,
     pub exp: u64,
-    pub acc: bool
+    pub acc: bool,
 }
 
 impl Claims for AuthClaims {
@@ -131,11 +156,9 @@ impl Claims for AuthClaims {
                 // expiration timestamp from unix epoch
                 exp: jsonwebtoken::get_current_timestamp() + *TOKEN_LIFETIME,
                 // access level
-                acc: user.is_admin
+                acc: user.is_admin,
             }),
-            Err(_) => {
-                Err(AuthError::from_error_type(AuthErrorType::TokenCreation))
-            }
+            Err(_) => Err(AuthError::from_error_type(AuthErrorType::TokenCreation)),
         }
     }
 }
@@ -162,7 +185,7 @@ pub struct AuthRequesterClaims {
     pub iss: String,
     pub com: String,
     pub sub: String,
-    pub exp: u64
+    pub exp: u64,
 }
 
 impl Claims for AuthRequesterClaims {
@@ -201,7 +224,7 @@ pub struct AuthError(types::auth::AuthError);
 impl AuthError {
     pub fn from_error_type(error_type: AuthErrorType) -> Self {
         Self {
-            0: types::auth::AuthError::from_error_type(error_type)
+            0: types::auth::AuthError::from_error_type(error_type),
         }
     }
     pub fn status(&self) -> StatusCode {

@@ -67,11 +67,17 @@ impl TodosVm {
         Self {
             priority_levels: PRIORITY_LEVELS
                 .iter()
-                .map(|(id, title)| LookupDto { id: *id, title: Some((*title).to_string()) })
+                .map(|(id, title)| LookupDto {
+                    id: *id,
+                    title: Some((*title).to_string()),
+                })
                 .collect(),
             colours: COLOURS
                 .iter()
-                .map(|(code, name)| ColourDto { code: (*code).to_string(), name: (*name).to_string() })
+                .map(|(code, name)| ColourDto {
+                    code: (*code).to_string(),
+                    name: (*name).to_string(),
+                })
                 .collect(),
             lists,
         }
@@ -143,7 +149,8 @@ mod tests {
 
     #[test]
     fn commands_deserialize_camel_case_with_missing_fields() {
-        let c: UpdateTodoItemDetailCommand = serde_json::from_str(r#"{"id":3,"listId":2,"priority":1}"#).unwrap();
+        let c: UpdateTodoItemDetailCommand =
+            serde_json::from_str(r#"{"id":3,"listId":2,"priority":1}"#).unwrap();
         assert_eq!((c.id, c.list_id, c.priority, c.note), (3, 2, 1, None));
         let c: CreateTodoListCommand = serde_json::from_str("{}").unwrap();
         assert!(c.title.is_none() && c.colour.is_none());

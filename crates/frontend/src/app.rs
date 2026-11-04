@@ -8,8 +8,8 @@ use crate::components::{
 use crate::hooks::use_user_info;
 use crate::views::{
     admin_view::AdminView, chat::Chat, home::Home, login::Login, not_found::NotFound,
-    register::Register, request_reset::RequestReset, reset::Reset, user_view::UserView,
-    todo::Todo, weather::Weather,
+    register::Register, request_reset::RequestReset, reset::Reset, todo::Todo, user_view::UserView,
+    weather::Weather,
 };
 
 /// App routes

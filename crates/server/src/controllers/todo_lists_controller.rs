@@ -1,25 +1,31 @@
 use axum::{
+    Router,
     extract::{Json, Path},
     http::{HeaderMap, StatusCode},
     middleware,
     routing::{get, put},
-    Router,
 };
 use types::{
     auth::{AuthErrorBody, AuthErrorType},
-    todo::{CreateTodoListCommand, TodosVm, UpdateTodoListCommand, COLOURS},
+    todo::{COLOURS, CreateTodoListCommand, TodosVm, UpdateTodoListCommand},
 };
 
 use crate::{
     middleware::token_authentication,
-    strategies::{authentication::{AuthClaims, AuthError, Claims}, todo, users::get_db_user_by_uuid},
+    strategies::{
+        authentication::{AuthClaims, AuthError, Claims},
+        todo,
+        users::get_db_user_by_uuid,
+    },
 };
 
 pub fn routes() -> Router {
     Router::new()
         .route("/", get(get_todo_lists).post(create_todo_list))
         .route("/{id}", put(update_todo_list).delete(delete_todo_list))
-        .layer(middleware::from_fn(token_authentication::authenticate_token::<AuthClaims>))
+        .layer(middleware::from_fn(
+            token_authentication::authenticate_token::<AuthClaims>,
+        ))
 }
 
 /// Resolves the id of the authenticated user from the verified token claims.
@@ -70,7 +76,9 @@ fn validate_colour(colour: Option<String>) -> Result<Option<String>, AuthError> 
     )
 )]
 pub async fn get_todo_lists(headers: HeaderMap) -> Result<(StatusCode, Json<TodosVm>), AuthError> {
-    let lists = todo::get_lists_with_items(current_user_id(&headers).await?).await.map_err(db_error)?;
+    let lists = todo::get_lists_with_items(current_user_id(&headers).await?)
+        .await
+        .map_err(db_error)?;
     Ok((StatusCode::OK, Json(TodosVm::new(lists))))
 }
 
@@ -89,11 +97,16 @@ pub async fn get_todo_lists(headers: HeaderMap) -> Result<(StatusCode, Json<Todo
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn create_todo_list(headers: HeaderMap, Json(command): Json<CreateTodoListCommand>) -> Result<(StatusCode, Json<i32>), AuthError> {
+pub async fn create_todo_list(
+    headers: HeaderMap,
+    Json(command): Json<CreateTodoListCommand>,
+) -> Result<(StatusCode, Json<i32>), AuthError> {
     let user_id = current_user_id(&headers).await?;
     let title = validate_title(command.title)?;
     let colour = validate_colour(command.colour)?.unwrap_or_else(|| COLOURS[0].0.to_string());
-    let id = todo::insert_list(user_id, title, colour).await.map_err(db_error)?;
+    let id = todo::insert_list(user_id, title, colour)
+        .await
+        .map_err(db_error)?;
     Ok((StatusCode::CREATED, Json(id)))
 }
 
@@ -114,14 +127,21 @@ pub async fn create_todo_list(headers: HeaderMap, Json(command): Json<CreateTodo
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn update_todo_list(headers: HeaderMap, Path(id): Path<i32>, Json(command): Json<UpdateTodoListCommand>) -> Result<StatusCode, AuthError> {
+pub async fn update_todo_list(
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+    Json(command): Json<UpdateTodoListCommand>,
+) -> Result<StatusCode, AuthError> {
     if id != command.id {
         return Err(AuthError::from_error_type(AuthErrorType::BadRequest));
     }
     let title = validate_title(command.title)?;
     let colour = validate_colour(command.colour)?;
     let user_id = current_user_id(&headers).await?;
-    if todo::update_list(user_id, id, title, colour).await.map_err(db_error)? {
+    if todo::update_list(user_id, id, title, colour)
+        .await
+        .map_err(db_error)?
+    {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(AuthError::from_error_type(AuthErrorType::NotFound))
@@ -143,7 +163,10 @@ pub async fn update_todo_list(headers: HeaderMap, Path(id): Path<i32>, Json(comm
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn delete_todo_list(headers: HeaderMap, Path(id): Path<i32>) -> Result<StatusCode, AuthError> {
+pub async fn delete_todo_list(
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, AuthError> {
     let user_id = current_user_id(&headers).await?;
     if todo::delete_list(user_id, id).await.map_err(db_error)? {
         Ok(StatusCode::NO_CONTENT)

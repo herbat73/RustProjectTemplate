@@ -5,11 +5,11 @@
 //! deleted at the end.
 
 use axum::{
-    body::{to_bytes, Body},
-    http::{header::AUTHORIZATION, Method, Request, StatusCode},
     Router,
+    body::{Body, to_bytes},
+    http::{Method, Request, StatusCode, header::AUTHORIZATION},
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 struct Response {
@@ -20,11 +20,19 @@ struct Response {
 
 impl Response {
     fn json(&self) -> Value {
-        serde_json::from_str(&self.body).unwrap_or_else(|e| panic!("invalid JSON body {:?}: {e}", self.body))
+        serde_json::from_str(&self.body)
+            .unwrap_or_else(|e| panic!("invalid JSON body {:?}: {e}", self.body))
     }
 }
 
-async fn send(app: &Router, method: Method, uri: &str, bearer: Option<&str>, body: Body, json_body: bool) -> Response {
+async fn send(
+    app: &Router,
+    method: Method,
+    uri: &str,
+    bearer: Option<&str>,
+    body: Body,
+    json_body: bool,
+) -> Response {
     let mut builder = Request::builder().method(method).uri(uri);
     if let Some(token) = bearer {
         builder = builder.header(AUTHORIZATION, format!("Bearer {token}"));
@@ -32,22 +40,54 @@ async fn send(app: &Router, method: Method, uri: &str, bearer: Option<&str>, bod
     if json_body {
         builder = builder.header("content-type", "application/json");
     }
-    let response = app.clone().oneshot(builder.body(body).unwrap()).await.unwrap();
+    let response = app
+        .clone()
+        .oneshot(builder.body(body).unwrap())
+        .await
+        .unwrap();
     let status = response.status();
-    let authorization = response
-        .headers()
-        .get(AUTHORIZATION)
-        .map(|v| v.to_str().unwrap().trim_start_matches("Bearer ").to_string());
+    let authorization = response.headers().get(AUTHORIZATION).map(|v| {
+        v.to_str()
+            .unwrap()
+            .trim_start_matches("Bearer ")
+            .to_string()
+    });
     let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    Response { status, authorization, body: String::from_utf8_lossy(&bytes).into_owned() }
+    Response {
+        status,
+        authorization,
+        body: String::from_utf8_lossy(&bytes).into_owned(),
+    }
 }
 
 async fn post_json(app: &Router, uri: &str, value: Value) -> Response {
-    send(app, Method::POST, uri, None, Body::from(value.to_string()), true).await
+    send(
+        app,
+        Method::POST,
+        uri,
+        None,
+        Body::from(value.to_string()),
+        true,
+    )
+    .await
 }
 
-async fn send_json(app: &Router, method: Method, uri: &str, bearer: &str, value: Value) -> Response {
-    send(app, method, uri, Some(bearer), Body::from(value.to_string()), true).await
+async fn send_json(
+    app: &Router,
+    method: Method,
+    uri: &str,
+    bearer: &str,
+    value: Value,
+) -> Response {
+    send(
+        app,
+        method,
+        uri,
+        Some(bearer),
+        Body::from(value.to_string()),
+        true,
+    )
+    .await
 }
 
 async fn get(app: &Router, uri: &str, bearer: Option<&str>) -> Response {
@@ -56,7 +96,10 @@ async fn get(app: &Router, uri: &str, bearer: Option<&str>) -> Response {
 
 async fn setup() -> Option<Router> {
     let _ = dotenv::dotenv();
-    let Some(database_url) = std::env::var("TEST_DATABASE_URL").or_else(|_| std::env::var("DATABASE_URL")).ok() else {
+    let Some(database_url) = std::env::var("TEST_DATABASE_URL")
+        .or_else(|_| std::env::var("DATABASE_URL"))
+        .ok()
+    else {
         eprintln!("skipping API tests: set TEST_DATABASE_URL or DATABASE_URL");
         return None;
     };
@@ -82,7 +125,12 @@ async fn setup() -> Option<Router> {
 fn jwt_payload(token: &str) -> Value {
     use base64::prelude::*;
     let payload = token.split('.').nth(1).expect("JWT payload segment");
-    serde_json::from_slice(&BASE64_URL_SAFE_NO_PAD.decode(payload).expect("base64url payload")).expect("JSON payload")
+    serde_json::from_slice(
+        &BASE64_URL_SAFE_NO_PAD
+            .decode(payload)
+            .expect("base64url payload"),
+    )
+    .expect("JSON payload")
 }
 
 /// Signs arbitrary claims with the test secret, to forge tokens with bad claims.
@@ -98,7 +146,12 @@ fn forge(claims: Value) -> String {
 /// Exchanges a requester token for a short-lived access token.
 async fn access_token(app: &Router, requester: &str) -> String {
     let response = get(app, "/auth/request", Some(requester)).await;
-    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
+    assert_eq!(
+        response.status,
+        StatusCode::CREATED,
+        "body: {}",
+        response.body
+    );
     response.authorization.clone().expect("access token header")
 }
 
@@ -115,8 +168,16 @@ async fn api_flow() {
     // --- register ---
     let register = json!({"username": alice, "pass": "pw12345!", "email": alice_email});
     let response = post_json(&app, "/auth/register", register.clone()).await;
-    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
-    assert!(response.authorization.is_some(), "register returns a requester token");
+    assert_eq!(
+        response.status,
+        StatusCode::CREATED,
+        "body: {}",
+        response.body
+    );
+    assert!(
+        response.authorization.is_some(),
+        "register returns a requester token"
+    );
     let info = response.json();
     assert_eq!(info["username"], alice.as_str());
     assert_eq!(info["email"], alice_email.as_str());
@@ -125,18 +186,47 @@ async fn api_flow() {
 
     // registering the same user again is rejected
     let response = post_json(&app, "/auth/register", register).await;
-    assert!(response.status.is_client_error(), "duplicate register: {} {}", response.status, response.body);
+    assert!(
+        response.status.is_client_error(),
+        "duplicate register: {} {}",
+        response.status,
+        response.body
+    );
 
     // --- login ---
-    let response = post_json(&app, "/auth/login", json!({"username": alice, "pass": "wrong"})).await;
+    let response = post_json(
+        &app,
+        "/auth/login",
+        json!({"username": alice, "pass": "wrong"}),
+    )
+    .await;
     assert_eq!(response.status, StatusCode::UNAUTHORIZED);
     assert_eq!(response.json()["error_type"], "WrongCredentials");
 
-    let response = post_json(&app, "/auth/login", json!({"username": "nobody", "pass": "pw12345!"})).await;
-    assert!(response.status.is_client_error(), "unknown user: {}", response.status);
+    let response = post_json(
+        &app,
+        "/auth/login",
+        json!({"username": "nobody", "pass": "pw12345!"}),
+    )
+    .await;
+    assert!(
+        response.status.is_client_error(),
+        "unknown user: {}",
+        response.status
+    );
 
-    let response = post_json(&app, "/auth/login", json!({"username": alice, "pass": "pw12345!"})).await;
-    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
+    let response = post_json(
+        &app,
+        "/auth/login",
+        json!({"username": alice, "pass": "pw12345!"}),
+    )
+    .await;
+    assert_eq!(
+        response.status,
+        StatusCode::CREATED,
+        "body: {}",
+        response.body
+    );
     let requester = response.authorization.clone().expect("requester token");
     assert_eq!(response.json()["username"], alice.as_str());
 
@@ -163,35 +253,72 @@ async fn api_flow() {
     let exp = jsonwebtoken::get_current_timestamp() + 60;
     let sub = jwt_payload(&access)["sub"].clone();
     let base = json!({"aud": "test.example.com", "iss": "TestCo", "com": "TestCo", "sub": sub, "exp": exp, "acc": false});
-    assert_eq!(get(&app, "/auth/test", Some(&forge(base.clone()))).await.status, StatusCode::OK, "sanity: forged valid token works");
+    assert_eq!(
+        get(&app, "/auth/test", Some(&forge(base.clone())))
+            .await
+            .status,
+        StatusCode::OK,
+        "sanity: forged valid token works"
+    );
     let mut bad_iss = base.clone();
     bad_iss["iss"] = json!("OtherCo");
-    assert_eq!(get(&app, "/auth/test", Some(&forge(bad_iss))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        get(&app, "/auth/test", Some(&forge(bad_iss))).await.status,
+        StatusCode::FORBIDDEN
+    );
     let mut no_iss = base.clone();
     no_iss.as_object_mut().unwrap().remove("iss");
-    assert_eq!(get(&app, "/auth/test", Some(&forge(no_iss))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        get(&app, "/auth/test", Some(&forge(no_iss))).await.status,
+        StatusCode::FORBIDDEN
+    );
     let mut bad_aud = base.clone();
     bad_aud["aud"] = json!("evil.example.com");
-    assert_eq!(get(&app, "/auth/test", Some(&forge(bad_aud))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        get(&app, "/auth/test", Some(&forge(bad_aud))).await.status,
+        StatusCode::FORBIDDEN
+    );
     let mut expired = base;
     expired["exp"] = json!(1_000_000);
-    assert_eq!(get(&app, "/auth/test", Some(&forge(expired))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        get(&app, "/auth/test", Some(&forge(expired))).await.status,
+        StatusCode::FORBIDDEN
+    );
 
     // each token type is only accepted where it belongs
-    assert_eq!(get(&app, "/auth/request", Some(&access)).await.status, StatusCode::FORBIDDEN, "access token must not work as a requester token");
-    assert_eq!(get(&app, "/auth/test", Some(&requester)).await.status, StatusCode::FORBIDDEN, "requester token must not work as an access token");
-    assert_eq!(get(&app, "/user/info", Some(&requester)).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        get(&app, "/auth/request", Some(&access)).await.status,
+        StatusCode::FORBIDDEN,
+        "access token must not work as a requester token"
+    );
+    assert_eq!(
+        get(&app, "/auth/test", Some(&requester)).await.status,
+        StatusCode::FORBIDDEN,
+        "requester token must not work as an access token"
+    );
+    assert_eq!(
+        get(&app, "/user/info", Some(&requester)).await.status,
+        StatusCode::FORBIDDEN
+    );
 
     // missing / garbage tokens
     let response = get(&app, "/user/info", None).await;
     assert_eq!(response.status, StatusCode::FORBIDDEN);
     assert_eq!(response.json()["error_type"], "InvalidToken");
-    assert_eq!(get(&app, "/user/info", Some("garbage")).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        get(&app, "/user/info", Some("garbage")).await.status,
+        StatusCode::FORBIDDEN
+    );
 
     // --- weather forecasts (random data, token-protected) ---
     let response = get(&app, "/api/WeatherForecasts", None).await;
     assert_eq!(response.status, StatusCode::FORBIDDEN);
-    assert_eq!(get(&app, "/api/WeatherForecasts", Some(&requester)).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        get(&app, "/api/WeatherForecasts", Some(&requester))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
 
     let response = get(&app, "/api/WeatherForecasts", Some(&access)).await;
     assert_eq!(response.status, StatusCode::OK, "body: {}", response.body);
@@ -200,104 +327,486 @@ async fn api_flow() {
     assert_eq!(forecasts.len(), 5);
     for forecast in forecasts {
         let date = forecast["date"].as_str().expect("date");
-        assert!(date.len() == 20 && date.ends_with('Z') && date.as_bytes()[10] == b'T', "date: {date}");
+        assert!(
+            date.len() == 20 && date.ends_with('Z') && date.as_bytes()[10] == b'T',
+            "date: {date}"
+        );
         let c = forecast["temperatureC"].as_i64().expect("temperatureC");
         assert!((-20..55).contains(&c), "temperatureC: {c}");
         let f = forecast["temperatureF"].as_i64().expect("temperatureF");
-        assert_eq!(f, (c as f64 * 9.0 / 5.0).round() as i64 + 32, "temperatureF consistent with temperatureC");
+        assert_eq!(
+            f,
+            (c as f64 * 9.0 / 5.0).round() as i64 + 32,
+            "temperatureF consistent with temperatureC"
+        );
         assert!(!forecast["summary"].as_str().expect("summary").is_empty());
     }
 
     // --- todo lists and items (token-protected, stored in TodoLists / TodoItems) ---
-    assert_eq!(get(&app, "/api/TodoLists", None).await.status, StatusCode::FORBIDDEN);
-    assert_eq!(get(&app, "/api/TodoLists", Some(&requester)).await.status, StatusCode::FORBIDDEN);
-    assert_eq!(send_json(&app, Method::POST, "/api/TodoItems", &requester, json!({"listId": 1, "title": "x"})).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        get(&app, "/api/TodoLists", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        get(&app, "/api/TodoLists", Some(&requester)).await.status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::POST,
+            "/api/TodoItems",
+            &requester,
+            json!({"listId": 1, "title": "x"})
+        )
+        .await
+        .status,
+        StatusCode::FORBIDDEN
+    );
 
     let list_title = format!("list_{suffix}");
-    let response = send_json(&app, Method::POST, "/api/TodoLists", &access, json!({"title": list_title, "colour": "#ff5733"})).await;
-    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
+    let response = send_json(
+        &app,
+        Method::POST,
+        "/api/TodoLists",
+        &access,
+        json!({"title": list_title, "colour": "#ff5733"}),
+    )
+    .await;
+    assert_eq!(
+        response.status,
+        StatusCode::CREATED,
+        "body: {}",
+        response.body
+    );
     let list_id = response.json().as_i64().expect("created list id");
-    let other = send_json(&app, Method::POST, "/api/TodoLists", &access, json!({"title": format!("other_{suffix}")})).await;
+    let other = send_json(
+        &app,
+        Method::POST,
+        "/api/TodoLists",
+        &access,
+        json!({"title": format!("other_{suffix}")}),
+    )
+    .await;
     assert_eq!(other.status, StatusCode::CREATED);
     let other_id = other.json().as_i64().unwrap();
 
     // validation
-    assert_eq!(send_json(&app, Method::POST, "/api/TodoLists", &access, json!({"title": "  "})).await.status, StatusCode::BAD_REQUEST);
-    assert_eq!(send_json(&app, Method::POST, "/api/TodoLists", &access, json!({"title": "t", "colour": "#123456"})).await.status, StatusCode::BAD_REQUEST);
-    assert_eq!(send_json(&app, Method::POST, "/api/TodoItems", &access, json!({"listId": list_id})).await.status, StatusCode::BAD_REQUEST);
-    assert_eq!(send_json(&app, Method::POST, "/api/TodoItems", &access, json!({"listId": 2_000_000_000, "title": "x"})).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send_json(
+            &app,
+            Method::POST,
+            "/api/TodoLists",
+            &access,
+            json!({"title": "  "})
+        )
+        .await
+        .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::POST,
+            "/api/TodoLists",
+            &access,
+            json!({"title": "t", "colour": "#123456"})
+        )
+        .await
+        .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::POST,
+            "/api/TodoItems",
+            &access,
+            json!({"listId": list_id})
+        )
+        .await
+        .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::POST,
+            "/api/TodoItems",
+            &access,
+            json!({"listId": 2_000_000_000, "title": "x"})
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
 
-    let response = send_json(&app, Method::POST, "/api/TodoItems", &access, json!({"listId": list_id, "title": "first"})).await;
-    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
+    let response = send_json(
+        &app,
+        Method::POST,
+        "/api/TodoItems",
+        &access,
+        json!({"listId": list_id, "title": "first"}),
+    )
+    .await;
+    assert_eq!(
+        response.status,
+        StatusCode::CREATED,
+        "body: {}",
+        response.body
+    );
     let item_id = response.json().as_i64().expect("created item id");
 
     // update item: id must match the URL
     let uri = format!("/api/TodoItems/{item_id}");
-    assert_eq!(send_json(&app, Method::PUT, &uri, &access, json!({"id": item_id + 1, "title": "x", "done": true})).await.status, StatusCode::BAD_REQUEST);
-    let response = send_json(&app, Method::PUT, &uri, &access, json!({"id": item_id, "title": "first (done)", "done": true})).await;
-    assert_eq!(response.status, StatusCode::NO_CONTENT, "body: {}", response.body);
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PUT,
+            &uri,
+            &access,
+            json!({"id": item_id + 1, "title": "x", "done": true})
+        )
+        .await
+        .status,
+        StatusCode::BAD_REQUEST
+    );
+    let response = send_json(
+        &app,
+        Method::PUT,
+        &uri,
+        &access,
+        json!({"id": item_id, "title": "first (done)", "done": true}),
+    )
+    .await;
+    assert_eq!(
+        response.status,
+        StatusCode::NO_CONTENT,
+        "body: {}",
+        response.body
+    );
 
     // update detail: move to the other list, set priority and note
     let uri_detail = format!("/api/TodoItems/UpdateDetail/{item_id}");
-    assert_eq!(send_json(&app, Method::PATCH, &uri_detail, &access, json!({"id": item_id, "listId": other_id, "priority": 9})).await.status, StatusCode::BAD_REQUEST);
-    assert_eq!(send_json(&app, Method::PATCH, &uri_detail, &access, json!({"id": item_id, "listId": 2_000_000_000, "priority": 1})).await.status, StatusCode::NOT_FOUND);
-    let response = send_json(&app, Method::PATCH, &uri_detail, &access, json!({"id": item_id, "listId": other_id, "priority": 3, "note": "remember"})).await;
-    assert_eq!(response.status, StatusCode::NO_CONTENT, "body: {}", response.body);
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PATCH,
+            &uri_detail,
+            &access,
+            json!({"id": item_id, "listId": other_id, "priority": 9})
+        )
+        .await
+        .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PATCH,
+            &uri_detail,
+            &access,
+            json!({"id": item_id, "listId": 2_000_000_000, "priority": 1})
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    let response = send_json(
+        &app,
+        Method::PATCH,
+        &uri_detail,
+        &access,
+        json!({"id": item_id, "listId": other_id, "priority": 3, "note": "remember"}),
+    )
+    .await;
+    assert_eq!(
+        response.status,
+        StatusCode::NO_CONTENT,
+        "body: {}",
+        response.body
+    );
 
     let response = get(&app, "/api/TodoLists", Some(&access)).await;
     assert_eq!(response.status, StatusCode::OK, "body: {}", response.body);
     let vm = response.json();
     assert_eq!(vm["priorityLevels"].as_array().unwrap().len(), 4);
-    assert!(vm["colours"].as_array().unwrap().iter().any(|c| c["code"] == "#FF5733"));
+    assert!(
+        vm["colours"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["code"] == "#FF5733")
+    );
     let lists = vm["lists"].as_array().unwrap();
-    let mine = lists.iter().find(|l| l["id"].as_i64() == Some(list_id)).expect("created list");
-    assert_eq!((mine["title"].as_str(), mine["colour"].as_str()), (Some(list_title.as_str()), Some("#FF5733")));
-    assert!(mine["items"].as_array().unwrap().is_empty(), "item was moved away");
-    let moved = &lists.iter().find(|l| l["id"].as_i64() == Some(other_id)).unwrap()["items"][0];
+    let mine = lists
+        .iter()
+        .find(|l| l["id"].as_i64() == Some(list_id))
+        .expect("created list");
+    assert_eq!(
+        (mine["title"].as_str(), mine["colour"].as_str()),
+        (Some(list_title.as_str()), Some("#FF5733"))
+    );
+    assert!(
+        mine["items"].as_array().unwrap().is_empty(),
+        "item was moved away"
+    );
+    let moved = &lists
+        .iter()
+        .find(|l| l["id"].as_i64() == Some(other_id))
+        .unwrap()["items"][0];
     assert_eq!(moved["id"].as_i64(), Some(item_id));
     assert_eq!(moved["listId"].as_i64(), Some(other_id));
-    assert_eq!((moved["title"].as_str(), moved["done"].as_bool(), moved["priority"].as_i64(), moved["note"].as_str()),
-        (Some("first (done)"), Some(true), Some(3), Some("remember")));
+    assert_eq!(
+        (
+            moved["title"].as_str(),
+            moved["done"].as_bool(),
+            moved["priority"].as_i64(),
+            moved["note"].as_str()
+        ),
+        (Some("first (done)"), Some(true), Some(3), Some("remember"))
+    );
 
     // update list
     let uri_list = format!("/api/TodoLists/{list_id}");
-    assert_eq!(send_json(&app, Method::PUT, &uri_list, &access, json!({"id": list_id + 1, "title": "x"})).await.status, StatusCode::BAD_REQUEST);
-    assert_eq!(send_json(&app, Method::PUT, &uri_list, &access, json!({"id": list_id, "title": "renamed", "colour": "#6666FF"})).await.status, StatusCode::NO_CONTENT);
-    assert_eq!(send_json(&app, Method::PUT, "/api/TodoLists/2000000000", &access, json!({"id": 2_000_000_000, "title": "x"})).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PUT,
+            &uri_list,
+            &access,
+            json!({"id": list_id + 1, "title": "x"})
+        )
+        .await
+        .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PUT,
+            &uri_list,
+            &access,
+            json!({"id": list_id, "title": "renamed", "colour": "#6666FF"})
+        )
+        .await
+        .status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PUT,
+            "/api/TodoLists/2000000000",
+            &access,
+            json!({"id": 2_000_000_000, "title": "x"})
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
 
     // another user cannot see or touch alice's todos
     let carol = format!("carol_{suffix}");
-    let response = post_json(&app, "/auth/register", json!({"username": carol, "pass": "pw12345!", "email": format!("{carol}@example.com")})).await;
-    assert_eq!(response.status, StatusCode::CREATED, "body: {}", response.body);
+    let response = post_json(
+        &app,
+        "/auth/register",
+        json!({"username": carol, "pass": "pw12345!", "email": format!("{carol}@example.com")}),
+    )
+    .await;
+    assert_eq!(
+        response.status,
+        StatusCode::CREATED,
+        "body: {}",
+        response.body
+    );
     let carol_access = access_token(&app, response.authorization.as_ref().unwrap()).await;
-    let carol_vm = get(&app, "/api/TodoLists", Some(&carol_access)).await.json();
-    assert!(carol_vm["lists"].as_array().unwrap().is_empty(), "carol sees no lists: {carol_vm}");
-    assert_eq!(send_json(&app, Method::PUT, &uri_list, &carol_access, json!({"id": list_id, "title": "hijack"})).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send(&app, Method::DELETE, &uri_list, Some(&carol_access), Body::empty(), false).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send_json(&app, Method::POST, "/api/TodoItems", &carol_access, json!({"listId": list_id, "title": "x"})).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send_json(&app, Method::PUT, &uri, &carol_access, json!({"id": item_id, "title": "hijack", "done": false})).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send_json(&app, Method::PATCH, &uri_detail, &carol_access, json!({"id": item_id, "listId": list_id, "priority": 1})).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send(&app, Method::DELETE, &uri, Some(&carol_access), Body::empty(), false).await.status, StatusCode::NOT_FOUND);
+    let carol_vm = get(&app, "/api/TodoLists", Some(&carol_access))
+        .await
+        .json();
+    assert!(
+        carol_vm["lists"].as_array().unwrap().is_empty(),
+        "carol sees no lists: {carol_vm}"
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PUT,
+            &uri_list,
+            &carol_access,
+            json!({"id": list_id, "title": "hijack"})
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(
+            &app,
+            Method::DELETE,
+            &uri_list,
+            Some(&carol_access),
+            Body::empty(),
+            false
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::POST,
+            "/api/TodoItems",
+            &carol_access,
+            json!({"listId": list_id, "title": "x"})
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PUT,
+            &uri,
+            &carol_access,
+            json!({"id": item_id, "title": "hijack", "done": false})
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PATCH,
+            &uri_detail,
+            &carol_access,
+            json!({"id": item_id, "listId": list_id, "priority": 1})
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(
+            &app,
+            Method::DELETE,
+            &uri,
+            Some(&carol_access),
+            Body::empty(),
+            false
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
     // her own list cannot receive alice's item either
-    let carol_list = send_json(&app, Method::POST, "/api/TodoLists", &carol_access, json!({"title": "carol's"})).await.json().as_i64().unwrap();
-    assert_eq!(send_json(&app, Method::PATCH, &uri_detail, &access, json!({"id": item_id, "listId": carol_list, "priority": 1})).await.status, StatusCode::NOT_FOUND);
+    let carol_list = send_json(
+        &app,
+        Method::POST,
+        "/api/TodoLists",
+        &carol_access,
+        json!({"title": "carol's"}),
+    )
+    .await
+    .json()
+    .as_i64()
+    .unwrap();
+    assert_eq!(
+        send_json(
+            &app,
+            Method::PATCH,
+            &uri_detail,
+            &access,
+            json!({"id": item_id, "listId": carol_list, "priority": 1})
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
 
     // delete item, then a list with an item: the item goes with it (cascade)
-    assert_eq!(send(&app, Method::DELETE, &uri, Some(&access), Body::empty(), false).await.status, StatusCode::NO_CONTENT);
-    assert_eq!(send(&app, Method::DELETE, &uri, Some(&access), Body::empty(), false).await.status, StatusCode::NOT_FOUND);
-    let response = send_json(&app, Method::POST, "/api/TodoItems", &access, json!({"listId": other_id, "title": "orphan"})).await;
+    assert_eq!(
+        send(
+            &app,
+            Method::DELETE,
+            &uri,
+            Some(&access),
+            Body::empty(),
+            false
+        )
+        .await
+        .status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        send(
+            &app,
+            Method::DELETE,
+            &uri,
+            Some(&access),
+            Body::empty(),
+            false
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    let response = send_json(
+        &app,
+        Method::POST,
+        "/api/TodoItems",
+        &access,
+        json!({"listId": other_id, "title": "orphan"}),
+    )
+    .await;
     let orphan_id = response.json().as_i64().unwrap();
     for id in [list_id, other_id] {
-        assert_eq!(send(&app, Method::DELETE, &format!("/api/TodoLists/{id}"), Some(&access), Body::empty(), false).await.status, StatusCode::NO_CONTENT);
+        assert_eq!(
+            send(
+                &app,
+                Method::DELETE,
+                &format!("/api/TodoLists/{id}"),
+                Some(&access),
+                Body::empty(),
+                false
+            )
+            .await
+            .status,
+            StatusCode::NO_CONTENT
+        );
     }
-    assert_eq!(send(&app, Method::DELETE, &format!("/api/TodoItems/{orphan_id}"), Some(&access), Body::empty(), false).await.status, StatusCode::NOT_FOUND, "cascade removed the item");
+    assert_eq!(
+        send(
+            &app,
+            Method::DELETE,
+            &format!("/api/TodoItems/{orphan_id}"),
+            Some(&access),
+            Body::empty(),
+            false
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND,
+        "cascade removed the item"
+    );
 
     // --- admin-only routes ---
     let response = get(&app, "/user/all", Some(&access)).await;
     assert_eq!(response.status, StatusCode::FORBIDDEN);
     assert_eq!(response.json()["error_type"], "AccessDenied");
 
-    let response = send(&app, Method::DELETE, "/user", Some(&access), Body::from("some-uuid"), false).await;
+    let response = send(
+        &app,
+        Method::DELETE,
+        "/user",
+        Some(&access),
+        Body::from("some-uuid"),
+        false,
+    )
+    .await;
     assert_eq!(response.status, StatusCode::FORBIDDEN);
 
     // promote alice to admin directly in the database, then get a fresh access token
@@ -309,25 +818,67 @@ async fn api_flow() {
     let admin_access = access_token(&app, &requester).await;
 
     // a second user to delete
-    let response = post_json(&app, "/auth/register", json!({"username": bob, "pass": "pw12345!", "email": bob_email})).await;
+    let response = post_json(
+        &app,
+        "/auth/register",
+        json!({"username": bob, "pass": "pw12345!", "email": bob_email}),
+    )
+    .await;
     assert_eq!(response.status, StatusCode::CREATED);
     let bob_uuid = response.json()["uuid"].as_str().unwrap().to_string();
 
     let response = get(&app, "/user/all", Some(&admin_access)).await;
     assert_eq!(response.status, StatusCode::OK, "body: {}", response.body);
     let users = response.json();
-    let names: Vec<&str> = users.as_array().unwrap().iter().map(|u| u["username"].as_str().unwrap()).collect();
-    assert!(names.contains(&alice.as_str()) && names.contains(&bob.as_str()), "users: {names:?}");
+    let names: Vec<&str> = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|u| u["username"].as_str().unwrap())
+        .collect();
+    assert!(
+        names.contains(&alice.as_str()) && names.contains(&bob.as_str()),
+        "users: {names:?}"
+    );
 
-    let response = send(&app, Method::DELETE, "/user", Some(&admin_access), Body::from(bob_uuid), false).await;
-    assert!(response.status.is_success(), "delete: {} {}", response.status, response.body);
+    let response = send(
+        &app,
+        Method::DELETE,
+        "/user",
+        Some(&admin_access),
+        Body::from(bob_uuid),
+        false,
+    )
+    .await;
+    assert!(
+        response.status.is_success(),
+        "delete: {} {}",
+        response.status,
+        response.body
+    );
 
     let users = get(&app, "/user/all", Some(&admin_access)).await.json();
-    let names: Vec<&str> = users.as_array().unwrap().iter().map(|u| u["username"].as_str().unwrap()).collect();
-    assert!(!names.contains(&bob.as_str()), "bob should be deleted: {names:?}");
+    let names: Vec<&str> = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|u| u["username"].as_str().unwrap())
+        .collect();
+    assert!(
+        !names.contains(&bob.as_str()),
+        "bob should be deleted: {names:?}"
+    );
 
     // --- password reset ---
-    let response = send(&app, Method::POST, "/auth/reset", None, Body::from("nobody@example.com"), false).await;
+    let response = send(
+        &app,
+        Method::POST,
+        "/auth/reset",
+        None,
+        Body::from("nobody@example.com"),
+        false,
+    )
+    .await;
     assert_eq!(response.status, StatusCode::NOT_FOUND);
     assert_eq!(response.json()["error_type"], "UserDoesNotExist");
 

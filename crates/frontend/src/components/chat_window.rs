@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use tauri_sys::core::{invoke_result, is_tauri};
-use wasm_bindgen::{closure::Closure, JsCast};
+use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{CloseEvent, MessageEvent, WebSocket};
 
 use crate::{

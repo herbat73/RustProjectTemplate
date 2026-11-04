@@ -1,29 +1,37 @@
 //! OpenAPI 3.2 document for the server API, generated from the `#[utoipa::path]` annotations
 //! on the handlers and the `ToSchema` derives on the shared types.
 
-use axum::{response::Html, routing::get, Json, Router};
+use axum::{Json, Router, response::Html, routing::get};
 use utoipa::{
-    openapi::{
-        security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
-        OpenApiVersion,
-    },
     Modify, OpenApi,
+    openapi::{
+        OpenApiVersion,
+        security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+    },
 };
 
-use crate::controllers::{auth_controller, todo_items_controller, todo_lists_controller, users_controller, weather_controller, ws_controller};
+use crate::controllers::{
+    auth_controller, todo_items_controller, todo_lists_controller, users_controller,
+    weather_controller, ws_controller,
+};
 
 struct SecuritySchemes;
 
 impl Modify for SecuritySchemes {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        let components = openapi.components.as_mut().expect("components are registered");
+        let components = openapi
+            .components
+            .as_mut()
+            .expect("components are registered");
         components.add_security_scheme(
             "access_token",
             SecurityScheme::Http(
                 HttpBuilder::new()
                     .scheme(HttpAuthScheme::Bearer)
                     .bearer_format("JWT")
-                    .description(Some("Short-lived access token, obtained from `GET /auth/request`."))
+                    .description(Some(
+                        "Short-lived access token, obtained from `GET /auth/request`.",
+                    ))
                     .build(),
             ),
         );
