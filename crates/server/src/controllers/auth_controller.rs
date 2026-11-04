@@ -10,7 +10,7 @@ use http::{header::AUTHORIZATION, HeaderMap, HeaderValue};
 use lettre::{message::header::ContentType, transport::smtp::{authentication::Credentials, client::Tls}, Message, SmtpTransport, Transport};
 use rand::distr::Alphanumeric;
 use rand::RngExt;
-use types::{auth::{AuthErrorType, AuthToken}, user::{LoginUser, RegisterUser, ResetUser, UserInfo}};
+use types::{auth::{AuthErrorBody, AuthErrorType, AuthToken}, user::{LoginUser, RegisterUser, ResetUser, UserInfo}};
 
 use crate::{middleware::token_authentication, strategies::{authentication::{AuthClaims, AuthError, AuthRequesterClaims, Claims}, users}};
 
@@ -18,7 +18,7 @@ struct TimeStampedEmail {
     time_stamp: SystemTime,
     email: EmailAddress
 }
-struct ResetKeysState {
+pub struct ResetKeysState {
     keys: Mutex<HashMap<String, TimeStampedEmail>>
 }
 
@@ -45,7 +45,18 @@ pub fn routes() -> Router {
             .with_state(key_state))
 }
 
-async fn test_auth_route(request: Request) -> Result<(StatusCode, String), AuthError> {
+/// Verifies that the supplied access token is valid.
+#[utoipa::path(
+    get,
+    path = "/auth/test",
+    tag = "auth",
+    security(("access_token" = [])),
+    responses(
+        (status = 200, description = "Token is valid", body = String, content_type = "text/plain", example = json!("Auth verified")),
+        (status = 403, description = "Missing or invalid token", body = AuthErrorBody),
+    )
+)]
+pub async fn test_auth_route(request: Request) -> Result<(StatusCode, String), AuthError> {
     // generate AuthClaims from encoded x-claim header
     let claims = AuthClaims::from_header(request.headers());
     println!("Authentication claims: {:?}", claims);
@@ -53,7 +64,18 @@ async fn test_auth_route(request: Request) -> Result<(StatusCode, String), AuthE
     Ok((StatusCode::OK, "Auth verified".to_string()))
 }
 
-async fn request_auth_token(request: Request) -> Result<(StatusCode, HeaderMap), AuthError> {
+/// Exchanges a requester token for a short-lived access token (returned in the `authorization` header).
+#[utoipa::path(
+    get,
+    path = "/auth/request",
+    tag = "auth",
+    security(("requester_token" = [])),
+    responses(
+        (status = 201, description = "New access token issued", headers(("authorization" = String, description = "Bearer JWT access token (short-lived)"))),
+        (status = 403, description = "Missing or invalid requester token", body = AuthErrorBody),
+    )
+)]
+pub async fn request_auth_token(request: Request) -> Result<(StatusCode, HeaderMap), AuthError> {
     // generate AuthRequesterClaims from encoded x-claim header
     let claims = AuthRequesterClaims::from_header(request.headers());
     // generate new AuthClaims token from UUID in AuthRequesterClaims
@@ -78,7 +100,20 @@ async fn request_auth_token(request: Request) -> Result<(StatusCode, HeaderMap),
 }
 
 // route for logging in user with provided LoginUser json
-async fn login_user(
+/// Logs in with a username (or email) and password.
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    tag = "auth",
+    request_body = LoginUser,
+    responses(
+        (status = 201, description = "Logged in; a requester token is returned in the `authorization` header", body = UserInfo,
+            headers(("authorization" = String, description = "Bearer JWT requester token"))),
+        (status = 401, description = "Wrong credentials", body = AuthErrorBody),
+        (status = 404, description = "User does not exist", body = AuthErrorBody),
+    )
+)]
+pub async fn login_user(
     Json(payload): Json<LoginUser>,
 ) -> Result<(StatusCode, HeaderMap, Json<UserInfo>), AuthError> {
     // check if supplied credentials are not empty
@@ -117,7 +152,21 @@ async fn login_user(
 
 
 // handler for creating a new user
-async fn register_user(
+/// Registers a new user.
+#[utoipa::path(
+    post,
+    path = "/auth/register",
+    tag = "auth",
+    request_body = RegisterUser,
+    responses(
+        (status = 201, description = "User created; a requester token is returned in the `authorization` header", body = UserInfo,
+            headers(("authorization" = String, description = "Bearer JWT requester token"))),
+        (status = 400, description = "Missing fields or invalid email", body = AuthErrorBody),
+        (status = 409, description = "Username or email already taken", body = AuthErrorBody),
+        (status = 500, description = "Server error", body = AuthErrorBody),
+    )
+)]
+pub async fn register_user(
     Json(payload): Json<RegisterUser>,
 ) -> Result<(StatusCode, HeaderMap, Json<UserInfo>), AuthError> {
     if payload.username.is_empty() || payload.pass.is_empty() || payload.email.is_empty() {
@@ -158,7 +207,20 @@ async fn register_user(
     Ok((StatusCode::CREATED, header_map.clone(), axum::Json(user_info)))
 }
 
-async fn request_reset(
+/// Requests a password reset email. The request body is the plain-text email address.
+#[utoipa::path(
+    post,
+    path = "/auth/reset",
+    tag = "auth",
+    request_body(content = String, content_type = "text/plain", description = "Email address of the account", example = json!("user@example.com")),
+    responses(
+        (status = 201, description = "Reset email sent"),
+        (status = 400, description = "Invalid email address", body = AuthErrorBody),
+        (status = 404, description = "User does not exist", body = AuthErrorBody),
+        (status = 500, description = "Server or mail configuration error", body = AuthErrorBody),
+    )
+)]
+pub async fn request_reset(
     State(state): State<Arc<ResetKeysState>>,
     email_address: String
 ) -> Result<StatusCode, AuthError> {
@@ -247,7 +309,21 @@ fn gen_reset_key() -> String {
     .collect()
 }
 
-async fn reset_password(
+/// Sets a new password using the key from the reset email.
+#[utoipa::path(
+    post,
+    path = "/auth/reset/{reset_key}",
+    tag = "auth",
+    params(("reset_key" = String, Path, description = "Key from the password reset email")),
+    request_body = ResetUser,
+    responses(
+        (status = 202, description = "Password updated"),
+        (status = 400, description = "Reset link is invalid or expired", body = AuthErrorBody),
+        (status = 404, description = "User does not exist", body = AuthErrorBody),
+        (status = 500, description = "Server error", body = AuthErrorBody),
+    )
+)]
+pub async fn reset_password(
     State(key_state):  State<Arc<ResetKeysState>>,
     Path(reset_key): Path<String>,
     Json(reset_user): Json<ResetUser>

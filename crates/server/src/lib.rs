@@ -5,6 +5,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 pub mod controllers;
 pub mod middleware;
+pub mod openapi;
 pub mod pool;
 pub mod strategies;
 
@@ -20,5 +21,6 @@ pub fn app() -> Router {
         .nest("/ws", controllers::ws_controller::routes())
         .nest("/auth", controllers::auth_controller::routes())
         .nest("/user", controllers::users_controller::routes())
+        .merge(openapi::routes())
         .layer(ServiceBuilder::new().layer(cors))
 }

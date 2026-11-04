@@ -1,0 +1,634 @@
+{
+  "openapi": "3.2.0",
+  "info": {
+    "title": "RustProjectTemplate API",
+    "description": "User authentication, user management and chat.",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logs in with a username (or email) and password.",
+        "operationId": "login_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Logged in; a requester token is returned in the `authorization` header",
+            "headers": {
+              "authorization": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Bearer JWT requester token"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Registers a new user.",
+        "operationId": "register_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "User created; a requester token is returned in the `authorization` header",
+            "headers": {
+              "authorization": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Bearer JWT requester token"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing fields or invalid email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Username or email already taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/request": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchanges a requester token for a short-lived access token (returned in the `authorization` header).",
+        "operationId": "request_auth_token",
+        "responses": {
+          "201": {
+            "description": "New access token issued",
+            "headers": {
+              "authorization": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Bearer JWT access token (short-lived)"
+              }
+            }
+          },
+          "403": {
+            "description": "Missing or invalid requester token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "requester_token": []
+          }
+        ]
+      }
+    },
+    "/auth/reset": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Requests a password reset email. The request body is the plain-text email address.",
+        "operationId": "request_reset",
+        "requestBody": {
+          "description": "Email address of the account",
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              },
+              "example": "user@example.com"
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Reset email sent"
+          },
+          "400": {
+            "description": "Invalid email address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server or mail configuration error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/reset/{reset_key}": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sets a new password using the key from the reset email.",
+        "operationId": "reset_password",
+        "parameters": [
+          {
+            "name": "reset_key",
+            "in": "path",
+            "description": "Key from the password reset email",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Password updated"
+          },
+          "400": {
+            "description": "Reset link is invalid or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/test": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Verifies that the supplied access token is valid.",
+        "operationId": "test_auth_route",
+        "responses": {
+          "200": {
+            "description": "Token is valid",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "Auth verified"
+              }
+            }
+          },
+          "403": {
+            "description": "Missing or invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ]
+      }
+    },
+    "/user": {
+      "delete": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Deletes a user by UUID. Admin only. The request body is the plain-text UUID.",
+        "operationId": "delete_user",
+        "requestBody": {
+          "description": "UUID of the user to delete",
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "User deleted"
+          },
+          "403": {
+            "description": "Missing or invalid token, or caller is not an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ]
+      }
+    },
+    "/user/all": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Lists all users. Admin only.",
+        "operationId": "get_all_user_info",
+        "responses": {
+          "200": {
+            "description": "All users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserInfo"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing or invalid token, or caller is not an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ]
+      }
+    },
+    "/user/info": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Returns the authenticated user's info.",
+        "operationId": "get_user_info",
+        "responses": {
+          "200": {
+            "description": "Authenticated user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing or invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ]
+      }
+    },
+    "/ws": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Documentation-only description of the chat WebSocket endpoint (OpenAPI cannot model WebSocket messages).",
+        "description": "After the upgrade, the client must send its requester token as the first text message; the\nserver closes the connection if it is invalid. Every later text message is broadcast to all\nconnected clients as `\"<username>: <message>\"`.",
+        "operationId": "ws_docs",
+        "responses": {
+          "101": {
+            "description": "Switching protocols to WebSocket"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuthErrorBody": {
+        "type": "object",
+        "required": [
+          "error_type",
+          "message"
+        ],
+        "properties": {
+          "error_type": {
+            "$ref": "#/components/schemas/AuthErrorType"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthErrorType": {
+        "type": "string",
+        "enum": [
+          "WrongCredentials",
+          "TokenCreation",
+          "UserAlreadyExists",
+          "UserDoesNotExist",
+          "InvalidToken",
+          "BadRequest",
+          "ServerError",
+          "AccessDenied",
+          "MissingFields",
+          "InvalidEmail",
+          "ResetLinkInvalid",
+          "PasswordDoesNotMatch"
+        ]
+      },
+      "LoginUser": {
+        "type": "object",
+        "required": [
+          "username",
+          "pass"
+        ],
+        "properties": {
+          "pass": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterUser": {
+        "type": "object",
+        "required": [
+          "username",
+          "pass",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "pass": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "ResetUser": {
+        "type": "object",
+        "required": [
+          "email_address",
+          "pass"
+        ],
+        "properties": {
+          "email_address": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "pass": {
+            "type": "string"
+          }
+        }
+      },
+      "UserInfo": {
+        "type": "object",
+        "required": [
+          "uuid",
+          "username",
+          "email",
+          "is_admin"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "is_admin": {
+            "type": "boolean"
+          },
+          "username": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "access_token": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Short-lived access token, obtained from `GET /auth/request`."
+      },
+      "requester_token": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Long-lived requester token, returned in the `authorization` header by login and register."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Authentication and password reset"
+    },
+    {
+      "name": "user",
+      "description": "User management"
+    },
+    {
+      "name": "chat",
+      "description": "Chat WebSocket"
+    }
+  ]
+}

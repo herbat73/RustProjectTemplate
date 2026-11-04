@@ -12,7 +12,8 @@ tower-http = { version = "0.7", features = ["cors"] }
 tokio = { version = "1.54", features = ["full"] }
 serde = { version = "1.0.229", features = ["derive"] }
 
-types = { path = "../types", features = ["sqlx"] }
+types = { path = "../types", features = ["sqlx", "openapi"] }
+utoipa = "6.0"
 dotenv = "0.15.0"
 sqlx = { version = "0.9.0", features = ["postgres", "sqlite", "any", "runtime-tokio", "tls-rustls"] }
 once_cell = "1.21.4"

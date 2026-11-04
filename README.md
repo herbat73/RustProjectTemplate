@@ -68,6 +68,19 @@ sqlx database create
 scripts/migrate.sh sqlite
 ```
 
+API documentation (OpenAPI 3.2)
+
+The server generates an OpenAPI 3.2 document from the `#[utoipa::path]` annotations on the handlers and the
+`ToSchema` derives on the shared types. While the server is running:
+- `http://localhost:3001/api-docs/openapi.json` serves the document
+- `http://localhost:3001/api-docs` serves a Swagger UI page (loads Swagger UI from unpkg)
+
+A copy is committed at `docs/openapi.json`. Regenerate it after changing any endpoint or type
+(a test fails if it is stale):
+```bash
+cargo run -q --bin openapi > docs/openapi.json
+```
+
 Run the API tests
 ```bash
 # Needs Postgres (docker compose up -d) with migrations applied (scripts/migrate.sh postgres).
