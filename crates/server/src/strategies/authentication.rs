@@ -49,7 +49,7 @@ impl Keys {
 // trait for JWT claims
 pub trait Claims {
     // create claim from UUID
-    async fn new(uuid: String) -> Result<Self, AuthError> where Self: Sized;
+    fn new(uuid: String) -> impl std::future::Future<Output = Result<Self, AuthError>> + Send where Self: Sized;
     // generate AuthToken from Claims
     fn generate_token(&self) -> Result<AuthToken, AuthError>
     where Self: Serialize {

@@ -68,6 +68,14 @@ sqlx database create
 scripts/migrate.sh sqlite
 ```
 
+Run the API tests
+```bash
+# Needs Postgres (docker compose up -d) with migrations applied (scripts/migrate.sh postgres).
+# Uses TEST_DATABASE_URL, falling back to DATABASE_URL from the environment or .env.
+# The test is skipped if neither is set. Test users are created with unique names and removed afterwards.
+cargo test -p server
+```
+
 Revert migrations
 ```bash
 # Postgres
@@ -82,7 +90,7 @@ Required environment variables, these can be stored in a .env file at the top le
 Copy as .env file and modify as you need.
 
 ## Contribute
-
+    
 Feel free to take a look at the current issues in this repo for anything that currently needs to be worked on.
 
 You are also welcome to open a PR or a new issue if you see something is missing or could be improved upon.
