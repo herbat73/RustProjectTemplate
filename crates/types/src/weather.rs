@@ -17,7 +17,7 @@ impl WeatherForecast {
         Self {
             date,
             temperature_c,
-            temperature_f: 32 + (temperature_c as f64 / 0.5556) as i32,
+            temperature_f: (f64::from(temperature_c) * 9.0 / 5.0).round() as i32 + 32,
             summary,
         }
     }
@@ -30,6 +30,8 @@ mod tests {
     #[test]
     fn computes_fahrenheit_from_celsius() {
         assert_eq!(WeatherForecast::new("d".into(), 0, "Mild".into()).temperature_f, 32);
+        assert_eq!(WeatherForecast::new("d".into(), 100, "Hot".into()).temperature_f, 212);
+        assert_eq!(WeatherForecast::new("d".into(), -20, "Freezing".into()).temperature_f, -4);
         assert_eq!(WeatherForecast::new("d".into(), 21, "Warm".into()).temperature_f, 69);
     }
 
