@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  server:
+    name: Server and shared crates
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.3
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: rest_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d rest_db"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      # The API test applies the migrations itself and cleans up the users it creates.
+      DATABASE_URL: postgres://admin:password@localhost:5432/rest_db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        # The Tauri crate (`app`) needs system GUI libraries and the frontend is built in its own job.
+        run: cargo test -p server -p types -p backend
+
+  frontend:
+    name: Frontend (wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: cargo check -p frontend --target wasm32-unknown-unknown
