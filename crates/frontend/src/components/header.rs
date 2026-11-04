@@ -1,31 +1,35 @@
-use yew::prelude::*;
-use crate::{app::AppRoute, components::buttons::nav_button::NavButton, hooks::use_user_info};
+use dioxus::prelude::*;
 
-#[function_component(Header)]
-pub fn header() -> Html {
+use crate::app::AppRoute;
+use crate::components::buttons::nav_button::NavButton;
+use crate::hooks::use_user_info;
+
+#[component]
+pub fn Header() -> Element {
     let user_info = use_user_info();
+    let logged_in = !user_info.uuid.is_empty();
 
-    html! {
-        <header class="flex flex-row h-12 z-50 fixed top-0 left-0 right-0 border-slate-300 dark:border-slate-700 border-b
+    rsx! {
+        header { class: "flex flex-row h-12 z-50 fixed top-0 left-0 right-0 border-slate-300 dark:border-slate-700 border-b
             bg-slate-100 dark:bg-slate-900 shadow-md w-full
-            justify-between justify-items-center items-center">
-            <div class="flex flex-row h-full">
-                <NavButton label="Home" destination={AppRoute::Home} />
-                if user_info.uuid != String::new() {
-                    <NavButton label="Chat" destination={AppRoute::Chat} />
+            justify-between justify-items-center items-center",
+            div { class: "flex flex-row h-full",
+                NavButton { label: "Home", destination: AppRoute::Home {} }
+                if logged_in {
+                    NavButton { label: "Chat", destination: AppRoute::ChatPage {} }
                 }
-            </div>
-            <div class="flex flex-row h-full pr-12">
-                if user_info.uuid != String::new() {
+            }
+            div { class: "flex flex-row h-full pr-12",
+                if logged_in {
                     if user_info.is_admin {
-                        <NavButton label="Admin" destination={AppRoute::AdminPanel} />
+                        NavButton { label: "Admin", destination: AppRoute::AdminPanel {} }
                     }
-                    <NavButton label={user_info.clone().username} destination={AppRoute::UserPanel} />
+                    NavButton { label: user_info.username.clone(), destination: AppRoute::UserPanel {} }
                 } else {
-                        <NavButton label="Login" destination={AppRoute::Login} />
-                        <NavButton label="Register" destination={AppRoute::Register} />
+                    NavButton { label: "Login", destination: AppRoute::Login {} }
+                    NavButton { label: "Register", destination: AppRoute::Register {} }
                 }
-            </div>
-        </header>
+            }
+        }
     }
 }
