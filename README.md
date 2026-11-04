@@ -2,7 +2,7 @@
 
 Modified Full stack rust template from https://github.com/sollambert/rust-full-stack-with-auth-template 
 
-This template is built using Yew, Tailwinds, Axum, Sqlx, and Tauri.
+This template is built using Dioxus, Tailwinds, Axum, Sqlx, and Tauri.
 
 This project is built to make full stack development with user authentication easily accessible for developers within an entirely Rust ecosystem.
 
@@ -18,7 +18,7 @@ The specific flavor of SQL is inferred from DATABASE_URL environment variable, h
 
 ## Crates
 
-- `frontend`: Yew frontend app for desktop client.
+- `frontend`: Dioxus frontend app for desktop client.
 - `backend`: Axum backend restful and websocket api for desktop client.
 - `server`: Axum server side restful and websocket api.
 - `types`: Common types shared by frontend/backend/server.

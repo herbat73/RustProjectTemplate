@@ -1,27 +1,17 @@
-use yew::{html::ChildrenRenderer, prelude::*, virtual_dom::VNode};
-use yew_router::history::{History, BrowserHistory};
+use dioxus::prelude::*;
 
-use crate::hooks::use_user_info;
+use crate::app::AppRoute;
+use crate::hooks::{use_user_info, USER_INFO};
 
-#[derive(Properties, PartialEq)]
-pub struct Props {
-    pub children: ChildrenRenderer<VNode>,
-}
-
-#[function_component(ProtectedRoute)]
-pub fn protected_route(props: &Props) -> Html {
-
-    let user_info = use_user_info();
+#[component]
+pub fn ProtectedRoute(children: Element) -> Element {
+    let _user_info = use_user_info();
 
     use_effect(move || {
-        if user_info.uuid == String::new() {
-            BrowserHistory::new().push("/login");
+        if USER_INFO.read().uuid.is_empty() {
+            navigator().push(AppRoute::Login {});
         }
     });
 
-    html! {
-        <>
-            { props.children.clone() }
-        </>
-    }
+    rsx! { {children} }
 }
