@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use tauri_sys::core::invoke_result;
+use tauri_sys::core::{invoke_result, is_tauri};
 use wasm_bindgen::{closure::Closure, JsCast};
 use web_sys::{CloseEvent, MessageEvent, WebSocket};
 
@@ -18,6 +18,11 @@ pub fn ChatWindow(#[props(default)] class: String) -> Element {
 
     // Get backend port automatically from tauri command.
     let port = use_resource(|| async {
+        // Outside Tauri (e.g. `trunk serve` in a browser) the invoke bridge does not exist and
+        // tauri-sys would panic, so skip it and fall back to the default port below.
+        if !is_tauri() {
+            return Ok(String::new());
+        }
         invoke_result::<String, String>("get_port", &())
             .await
             .map_err(|e| format!("Error: {:?}", e))
