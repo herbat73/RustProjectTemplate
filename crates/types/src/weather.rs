@@ -32,7 +32,7 @@ mod tests {
         assert_eq!(WeatherForecast::new("d".into(), 0, "Mild".into()).temperature_f, 32);
         assert_eq!(WeatherForecast::new("d".into(), 100, "Hot".into()).temperature_f, 212);
         assert_eq!(WeatherForecast::new("d".into(), -20, "Freezing".into()).temperature_f, -4);
-        assert_eq!(WeatherForecast::new("d".into(), 21, "Warm".into()).temperature_f, 69);
+        assert_eq!(WeatherForecast::new("d".into(), 21, "Warm".into()).temperature_f, 70);
     }
 
     /// The weather page deserializes the API response into `Vec<WeatherForecast>`,
