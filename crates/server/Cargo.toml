@@ -33,3 +33,6 @@ rand = "0.10.3"
 [features]
 sqlite = []
 postgres = []
+
+[dev-dependencies]
+tower = { version = "0.5.3", features = ["util"] }
