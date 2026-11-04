@@ -29,6 +29,20 @@ pub fn routes() -> Router {
         .with_state(app_state)
 }
 
+/// Documentation-only description of the chat WebSocket endpoint (OpenAPI cannot model WebSocket messages).
+///
+/// After the upgrade, the client must send its requester token as the first text message; the
+/// server closes the connection if it is invalid. Every later text message is broadcast to all
+/// connected clients as `"<username>: <message>"`.
+#[utoipa::path(
+    get,
+    path = "/ws",
+    tag = "chat",
+    responses((status = 101, description = "Switching protocols to WebSocket"))
+)]
+#[allow(dead_code)]
+pub fn ws_docs() {}
+
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     ws.on_upgrade(|socket| {handle_socket(socket, state)})
 }

@@ -80,6 +80,7 @@ impl AuthError {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AuthErrorType {
     WrongCredentials,
     TokenCreation,
@@ -96,6 +97,7 @@ pub enum AuthErrorType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AuthErrorBody {
     pub error_type: AuthErrorType,
     pub message: String

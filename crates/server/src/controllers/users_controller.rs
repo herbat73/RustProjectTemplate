@@ -2,7 +2,7 @@ use axum::{
     extract::{Json, Request}, http::StatusCode, middleware, routing::{delete, get}, RequestExt, Router
 };
 
-use types::{auth::AuthErrorType, user::UserInfo};
+use types::{auth::{AuthErrorBody, AuthErrorType}, user::UserInfo};
 
 use crate::{middleware::token_authentication, strategies::{authentication::{AuthClaims, AuthError, Claims}, users::{delete_user_by_uuid, get_all_users, get_db_user_by_uuid}}};
 
@@ -23,7 +23,19 @@ pub fn routes() -> Router {
 
 
 // get user info by JWT claims
-async fn get_user_info(request: Request) -> Result<(StatusCode, Json<UserInfo>), AuthError> {
+/// Returns the authenticated user's info.
+#[utoipa::path(
+    get,
+    path = "/user/info",
+    tag = "user",
+    security(("access_token" = [])),
+    responses(
+        (status = 200, description = "Authenticated user", body = UserInfo),
+        (status = 403, description = "Missing or invalid token", body = AuthErrorBody),
+        (status = 404, description = "User does not exist", body = AuthErrorBody),
+    )
+)]
+pub async fn get_user_info(request: Request) -> Result<(StatusCode, Json<UserInfo>), AuthError> {
     // generate AuthClaims from encoded x-claim header
     let claims = AuthClaims::from_header(request.headers());
     match get_db_user_by_uuid(claims.sub).await {
@@ -34,7 +46,18 @@ async fn get_user_info(request: Request) -> Result<(StatusCode, Json<UserInfo>),
 }
 
 // get user info by JWT claims
-async fn get_all_user_info(request: Request) -> Result<(StatusCode, Json<Vec<UserInfo>>), AuthError> {
+/// Lists all users. Admin only.
+#[utoipa::path(
+    get,
+    path = "/user/all",
+    tag = "user",
+    security(("access_token" = [])),
+    responses(
+        (status = 200, description = "All users", body = Vec<UserInfo>),
+        (status = 403, description = "Missing or invalid token, or caller is not an admin", body = AuthErrorBody),
+    )
+)]
+pub async fn get_all_user_info(request: Request) -> Result<(StatusCode, Json<Vec<UserInfo>>), AuthError> {
     // generate AuthRequesterClaims from encoded x-claim header
     let claims = AuthClaims::from_header(request.headers());
     if claims.acc {
@@ -48,7 +71,21 @@ async fn get_all_user_info(request: Request) -> Result<(StatusCode, Json<Vec<Use
     }
 }
 
-async fn delete_user(request: Request) -> Result<StatusCode, AuthError> {
+/// Deletes a user by UUID. Admin only. The request body is the plain-text UUID.
+#[utoipa::path(
+    delete,
+    path = "/user",
+    tag = "user",
+    security(("access_token" = [])),
+    request_body(content = String, content_type = "text/plain", description = "UUID of the user to delete"),
+    responses(
+        (status = 200, description = "User deleted"),
+        (status = 403, description = "Missing or invalid token, or caller is not an admin", body = AuthErrorBody),
+        (status = 404, description = "User does not exist", body = AuthErrorBody),
+        (status = 500, description = "Server error", body = AuthErrorBody),
+    )
+)]
+pub async fn delete_user(request: Request) -> Result<StatusCode, AuthError> {
     // generate AuthRequesterClaims from encoded x-claim header
     let claims = AuthClaims::from_header(request.headers());
     let uuid = request.extract().await;

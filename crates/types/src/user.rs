@@ -41,6 +41,7 @@ impl <'r> FromRow<'r, AnyRow> for User {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RegisterUser {
     pub username: String,
     pub pass: String,
@@ -67,6 +68,7 @@ impl RegisterUser {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LoginUser {
     pub username: String,
     pub pass: String
@@ -91,7 +93,9 @@ impl LoginUser {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ResetUser {
+    #[cfg_attr(feature = "openapi", schema(value_type = String, format = "email", example = "user@example.com"))]
     pub email_address: EmailAddress,
     pub pass: String
 }
@@ -116,6 +120,7 @@ impl ResetUser {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UserInfo {
     pub uuid: String,
     pub username: String,
