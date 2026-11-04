@@ -1,5 +1,5 @@
 use std::env;
-use axum::{async_trait, body::Body, extract::FromRequestParts, http::request::Parts, response::{IntoResponse, Response}, Json, RequestPartsExt};
+use axum::{body::Body, extract::FromRequestParts, http::request::Parts, response::{IntoResponse, Response}, Json, RequestPartsExt};
 use axum_extra::{headers::{Authorization, authorization::Bearer}, TypedHeader};
 use http::{HeaderMap, StatusCode};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
@@ -48,8 +48,6 @@ impl Keys {
 
 // trait for JWT claims
 pub trait Claims {
-    // create empty claim
-    fn default() -> Self;
     // create claim from UUID
     async fn new(uuid: String) -> Result<Self, AuthError> where Self: Sized;
     // generate AuthToken from Claims
@@ -118,20 +116,6 @@ pub struct AuthClaims {
 }
 
 impl Claims for AuthClaims {
-    fn default() -> AuthClaims {
-        Self {
-            // user uuid
-            sub: String::new(),
-            // issuer domain
-            aud: env::var("COMPANY_DOMAIN").unwrap(),
-            // issuer company
-            com: env::var("COMPANY_NAME").unwrap(),
-            // expiration timestamp from unix epoch
-                exp: jsonwebtoken::get_current_timestamp() + *TOKEN_LIFETIME,
-            // access level
-            acc: false
-        }
-    }
     async fn new(uuid: String) -> Result<AuthClaims, AuthError> {
         match get_db_user_by_uuid(uuid).await {
             Ok(user) => Ok(Self {
@@ -156,7 +140,6 @@ impl Claims for AuthClaims {
 /**
  * Implement FromRequestParts trait for AuthClaims struct to allow extracting from request body
  */
-#[async_trait]
 impl<S> FromRequestParts<S> for AuthClaims
 where
     S: Sync,
@@ -177,19 +160,6 @@ pub struct AuthRequesterClaims {
 }
 
 impl Claims for AuthRequesterClaims {
-    fn default() -> AuthRequesterClaims {
-        Self {
-            // user uuid
-            sub: String::new(),
-            // issuer domain
-            aud: env::var("COMPANY_DOMAIN").unwrap(),
-            // issuer company
-            com: env::var("COMPANY_NAME").unwrap(),
-            // expiration timestamp from unix epoch
-            exp: jsonwebtoken::get_current_timestamp() + *TOKEN_REQUESTER_LIFETIME,
-            // access level
-        }
-    }
     async fn new(uuid: String) -> Result<AuthRequesterClaims, AuthError> {
         Ok(Self {
             // user uuid
@@ -207,7 +177,6 @@ impl Claims for AuthRequesterClaims {
 /**
  * Implement FromRequestParts trait for AuthRequesterClaims struct to allow extracting from request body
  */
-#[async_trait]
 impl<S> FromRequestParts<S> for AuthRequesterClaims
 where
     S: Sync,
