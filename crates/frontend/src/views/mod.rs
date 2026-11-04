@@ -8,3 +8,4 @@ pub mod not_found;
 pub mod admin_view;
 pub mod user_view;
 pub mod weather;
+pub mod todo;
