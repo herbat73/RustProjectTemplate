@@ -150,8 +150,10 @@ where
     }
 }
 
-// Struct for JWT claims for requesting auth tokens with access level
+// Struct for JWT claims for requesting auth tokens with access level.
+// Unknown fields are denied so an access token (which carries `acc`) is never accepted as a requester token.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AuthRequesterClaims {
     pub aud: String,
     pub com: String,

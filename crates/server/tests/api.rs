@@ -126,9 +126,14 @@ async fn api_flow() {
     assert_eq!(response.status, StatusCode::OK);
     assert_eq!(response.body, "Auth verified");
 
-    let response = get(&app, "/user/info", Some(&requester)).await;
+    let response = get(&app, "/user/info", Some(&access)).await;
     assert_eq!(response.status, StatusCode::OK, "body: {}", response.body);
     assert_eq!(response.json()["username"], alice.as_str());
+
+    // each token type is only accepted where it belongs
+    assert_eq!(get(&app, "/auth/request", Some(&access)).await.status, StatusCode::FORBIDDEN, "access token must not work as a requester token");
+    assert_eq!(get(&app, "/auth/test", Some(&requester)).await.status, StatusCode::FORBIDDEN, "requester token must not work as an access token");
+    assert_eq!(get(&app, "/user/info", Some(&requester)).await.status, StatusCode::FORBIDDEN);
 
     // missing / garbage tokens
     let response = get(&app, "/user/info", None).await;

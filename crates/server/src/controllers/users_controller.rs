@@ -4,7 +4,7 @@ use axum::{
 
 use types::{auth::AuthErrorType, user::UserInfo};
 
-use crate::{middleware::token_authentication, strategies::{authentication::{AuthClaims, AuthError, AuthRequesterClaims, Claims}, users::{delete_user_by_uuid, get_all_users, get_db_user_by_uuid}}};
+use crate::{middleware::token_authentication, strategies::{authentication::{AuthClaims, AuthError, Claims}, users::{delete_user_by_uuid, get_all_users, get_db_user_by_uuid}}};
 
 // route function to nest endpoints in router
 pub fn routes() -> Router {
@@ -12,7 +12,7 @@ pub fn routes() -> Router {
     Router::new()
         .nest("/info", Router::new()
             .route("/",get(get_user_info))
-            .layer(middleware::from_fn(token_authentication::authenticate_token::<AuthRequesterClaims>)))
+            .layer(middleware::from_fn(token_authentication::authenticate_token::<AuthClaims>)))
         .nest("/all", Router::new()
             .route("/",get(get_all_user_info))
             .layer(middleware::from_fn(token_authentication::authenticate_token::<AuthClaims>)))
@@ -24,8 +24,8 @@ pub fn routes() -> Router {
 
 // get user info by JWT claims
 async fn get_user_info(request: Request) -> Result<(StatusCode, Json<UserInfo>), AuthError> {
-    // generate AuthRequesterClaims from encoded x-claim header
-    let claims = AuthRequesterClaims::from_header(request.headers());
+    // generate AuthClaims from encoded x-claim header
+    let claims = AuthClaims::from_header(request.headers());
     match get_db_user_by_uuid(claims.sub).await {
         Ok(user) => {
             Ok((StatusCode::OK, axum::Json(UserInfo::from_user(user))))
