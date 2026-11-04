@@ -1,0 +1,37 @@
+$kind: collection
+name: RustProject
+scripts:
+  - type: 'http:beforeRequest'
+    language: text/javascript
+    code: |-
+      // Two-step auth: login → exchange for short-lived access token (expires in 1s)
+      pm.sendRequest({
+          url: pm.environment.get('baseUrl') + '/auth/login',
+          method: 'POST',
+          header: { 'Content-Type': 'application/json' },
+          body: {
+              mode: 'raw',
+              raw: JSON.stringify({
+                  username: pm.environment.get('username'),
+                  pass: pm.environment.get('password')
+              })
+          }
+      }, function(err, loginRes) {
+          if (err || loginRes.code !== 201) {
+              console.error('Login failed: ' + (err || loginRes.status));
+              return;
+          }
+          var requesterToken = loginRes.headers.get('authorization');
+          // Exchange the long-lived requester token for the short-lived access token
+          pm.sendRequest({
+              url: pm.environment.get('baseUrl') + '/auth/request',
+              method: 'GET',
+              header: { 'Authorization': 'Bearer ' + requesterToken }
+          }, function(err2, tokenRes) {
+              if (err2 || tokenRes.code !== 201) {
+                  console.error('Token exchange failed: ' + (err2 || tokenRes.status));
+                  return;
+              }
+              pm.environment.set('accessToken', tokenRes.headers.get('authorization'));
+          });
+      });

@@ -1,0 +1,22 @@
+$kind: http-request
+name: Auth Request Access Token
+method: GET
+url: '{{baseUrl}}/auth/request'
+order: 5000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{requesterToken}}'
+scripts:
+  - type: 'http:afterResponse'
+    language: text/javascript
+    code: |-
+      pm.test('exchange returns 201 and access token with iss claim', function () {
+          pm.response.to.have.status(201);
+          var auth = pm.response.headers.get('authorization');
+          var t = auth.replace(/^Bearer /, '').split('.')[1];
+          var c = JSON.parse(atob(t.replace(/-/g, '+').replace(/_/g, '/')));
+          pm.expect(c).to.include.keys('aud', 'iss', 'com', 'sub', 'exp');
+          pm.expect(c.iss).to.equal(c.com);
+      });

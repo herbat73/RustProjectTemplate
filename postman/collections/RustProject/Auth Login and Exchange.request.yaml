@@ -1,0 +1,29 @@
+$kind: http-request
+name: Auth Login and Exchange
+method: POST
+url: '{{baseUrl}}/auth/login'
+order: 4000
+body:
+  type: json
+  content: |-
+    {
+      "username": "{{username}}",
+      "pass": "{{password}}"
+    }
+scripts:
+  - type: 'http:afterResponse'
+    language: text/javascript
+    code: |-
+      function claims(h) {
+          var t = h.replace(/^Bearer /, '').split('.')[1];
+          return JSON.parse(atob(t.replace(/-/g, '+').replace(/_/g, '/')));
+      }
+      pm.test('login returns 201 and requester token with iss claim', function () {
+          pm.response.to.have.status(201);
+          var auth = pm.response.headers.get('authorization');
+          pm.expect(auth).to.be.a('string');
+          var c = claims(auth);
+          pm.expect(c).to.include.keys('aud', 'iss', 'com', 'sub', 'exp');
+          pm.expect(c.iss).to.equal(c.com);
+          pm.environment.set('requesterToken', auth);
+      });

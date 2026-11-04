@@ -1,0 +1,28 @@
+$kind: http-request
+name: Get Weather Forecasts
+method: GET
+url: '{{baseUrl}}/api/WeatherForecasts'
+order: 1000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+scripts:
+  - type: 'http:afterResponse'
+    language: text/javascript
+    code: |-
+      pm.test('200 OK with JSON array of 5 forecasts', function () {
+          pm.response.to.have.status(200);
+          var body = pm.response.json();
+          pm.expect(body).to.be.an('array').with.lengthOf(5);
+      });
+      pm.test('each forecast matches WeatherForecast schema', function () {
+          pm.response.json().forEach(function (f) {
+              pm.expect(f).to.have.all.keys('date', 'temperatureC', 'temperatureF', 'summary');
+              pm.expect(f.date).to.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+              pm.expect(f.temperatureC).to.be.within(-20, 54);
+              pm.expect(f.temperatureF).to.equal(32 + Math.trunc(f.temperatureC / 0.5556));
+              pm.expect(f.summary).to.be.a('string').that.is.not.empty;
+          });
+      });

@@ -1,0 +1,18 @@
+$kind: http-request
+name: Auth Test
+method: GET
+url: '{{baseUrl}}/auth/test'
+order: 3000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+scripts:
+  - type: 'http:afterResponse'
+    language: text/javascript
+    code: |-
+      pm.test('valid access token is accepted (claims incl. iss)', function () {
+          pm.response.to.have.status(200);
+          pm.expect(pm.response.text()).to.equal('Auth verified');
+      });
