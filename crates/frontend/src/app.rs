@@ -9,6 +9,7 @@ use crate::hooks::use_user_info;
 use crate::views::{
     admin_view::AdminView, chat::Chat, home::Home, login::Login, not_found::NotFound,
     register::Register, request_reset::RequestReset, reset::Reset, user_view::UserView,
+    weather::Weather,
 };
 
 /// App routes
@@ -24,6 +25,8 @@ pub enum AppRoute {
         UserPanel {},
         #[route("/chat")]
         ChatPage {},
+        #[route("/weather")]
+        WeatherPage {},
         #[route("/login")]
         Login {},
         #[route("/register")]
@@ -49,6 +52,11 @@ fn UserPanel() -> Element {
 #[component]
 fn ChatPage() -> Element {
     rsx! { ProtectedRoute { Chat {} } }
+}
+
+#[component]
+fn WeatherPage() -> Element {
+    rsx! { ProtectedRoute { Weather {} } }
 }
 
 #[component]
