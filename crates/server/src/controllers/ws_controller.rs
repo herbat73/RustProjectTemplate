@@ -58,7 +58,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             if msg == String::new() {
                 break;
             }
-            if sender.send(Message::Text(msg)).await.is_err() {
+            if sender.send(Message::Text(msg.into())).await.is_err() {
                 break;
             }
         }

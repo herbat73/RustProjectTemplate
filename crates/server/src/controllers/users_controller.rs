@@ -16,7 +16,7 @@ pub fn routes() -> Router {
         .nest("/all", Router::new()
             .route("/",get(get_all_user_info))
             .layer(middleware::from_fn(token_authentication::authenticate_token::<AuthClaims>)))
-        .nest("/", Router::new()
+        .merge(Router::new()
             .route("/", delete(delete_user))
             .layer(middleware::from_fn(token_authentication::authenticate_token::<AuthClaims>)))
 }

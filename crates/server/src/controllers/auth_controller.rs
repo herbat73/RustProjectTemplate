@@ -8,8 +8,8 @@ use email_address::EmailAddress;
 use futures::lock::Mutex;
 use http::{header::AUTHORIZATION, HeaderMap, HeaderValue};
 use lettre::{message::header::ContentType, transport::smtp::{authentication::Credentials, client::Tls}, Message, SmtpTransport, Transport};
-use rand::distributions::Alphanumeric;
-use rand::Rng;
+use rand::distr::Alphanumeric;
+use rand::RngExt;
 use types::{auth::{AuthErrorType, AuthToken}, user::{LoginUser, RegisterUser, ResetUser, UserInfo}};
 
 use crate::{middleware::token_authentication, strategies::{authentication::{AuthClaims, AuthError, AuthRequesterClaims, Claims}, users}};
@@ -41,7 +41,7 @@ pub fn routes() -> Router {
         .route("/register", post(register_user))
         .nest("/reset", Router::new()
             .route("/", post(request_reset))
-            .route("/:reset_key", post(reset_password))
+            .route("/{reset_key}", post(reset_password))
             .with_state(key_state))
 }
 
@@ -240,7 +240,7 @@ async fn request_reset(
 }
 
 fn gen_reset_key() -> String {
-    rand::thread_rng()
+    rand::rng()
     .sample_iter(&Alphanumeric)
     .take(64)
     .map(char::from)
