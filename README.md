@@ -1,16 +1,27 @@
 # Rust Project Template
 
-Modified Full stack rust template from https://github.com/sollambert/rust-full-stack-with-auth-template 
+Refactored and modified [full stack rust template](https://github.com/sollambert/rust-full-stack-with-auth-template) 
 
-This template is built using Dioxus, Tailwinds, Axum, Sqlx, utoipa, Tauri.
+Built using:
+- Dioxus
+- Tailwinds
+- Axum
+- Sqlx
+- Utoipa
+- Tauri
 
 This project is built to make full stack development with user authentication easily accessible for developers within an entirely Rust ecosystem.
 
-In here you'll find some quick demos to get you started with an entirely Rust web environment!
+## Web API and UI for:
+- register, login user
+- ToDos user lists with ToDos items
+- fake random, WeatherForecasts
 
-Authentication/authorization is achieved with JSON Web Tokens. This is achieved in a two-part authentication process that involves the user signing in/creating an account at which point they are issued an authentication token for a defined amount of time.
+Authentication/authorization is achieved with JSON Web Tokens. 
+This is achieved in a two-part authentication process that involves the user signing in/creating an account at which point they are issued an authentication token for a defined amount of time.
 
-With this token, users are then able to request authorization tokens to perform authorized actions depending on access level. Through frontend middleware, this process is handled automatically and the authorization token is placed into request headers as a Bearer auth token whenever a request is sent to the backend.
+With this token, users are then able to request authorization tokens to perform authorized actions depending on access level. 
+Through frontend middleware, this process is handled automatically and the authorization token is placed into request headers as a Bearer auth token whenever a request is sent to the backend.
 
 Web socket authentication functions slightly differently, as the authentication handshake occurs through the first message of a freshly opened websocket instead of being sent as a Bearer auth header.
 
