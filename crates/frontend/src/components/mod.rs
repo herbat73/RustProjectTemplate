@@ -4,6 +4,7 @@ pub mod chat_window;
 pub mod error_message;
 pub mod footer;
 pub mod header;
+pub mod theme_toggle;
 pub mod user_info_panel;
 pub mod users_table;
 pub mod button;
