@@ -41,7 +41,7 @@ Install
 
 ```bash
 rustup target add wasm32-unknown-unknown
-cargo install trunk
+cargo install dioxus-cli --locked
 cargo install tauri-cli
 cargo install sqlx-cli
 ```
@@ -67,7 +67,7 @@ cargo tauri build
 Run web frontend
 ```bash
 cd crates/frontend
-trunk serve
+dx serve --platform web
 ```
 
 Run migrations (creates the database first if it does not exist)

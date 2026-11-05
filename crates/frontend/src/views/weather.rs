@@ -1,7 +1,11 @@
 use dioxus::prelude::*;
 use types::weather::WeatherForecast;
 
-use crate::components::{buttons::button::Button, error_message::ErrorMessage};
+use crate::components::{
+    button::Button,
+    card::{Card, CardContent},
+    error_message::ErrorMessage,
+};
 use crate::services::{self, AuthError};
 
 #[component]
@@ -29,32 +33,33 @@ pub fn Weather() -> Element {
             if let Some(error) = error_state.read().clone() {
                 ErrorMessage { message: error.body().message }
             }
-            div { class: "w-11/12 flex flex-col rounded-md text-lg overflow-y-auto
-                border-slate-300 dark:border-slate-700 border px-4 py-2
-                bg-slate-100 text-slate-800 shadow-md
-                dark:bg-slate-900 dark:text-slate-100",
-                table {
-                    thead {
-                        tr { class: "text-left",
-                            th { "Date" }
-                            th { "Temp. (C)" }
-                            th { "Temp. (F)" }
-                            th { "Summary" }
-                        }
-                    }
-                    tbody {
-                        for forecast in forecasts.read().iter().cloned() {
-                            tr { key: "{forecast.date}",
-                                td { "{forecast.date}" }
-                                td { "{forecast.temperature_c}" }
-                                td { "{forecast.temperature_f}" }
-                                td { "{forecast.summary}" }
+            div { class: "w-11/12 overflow-y-auto",
+                Card {
+                    CardContent {
+                        table {
+                            thead {
+                                tr { class: "text-left",
+                                    th { "Date" }
+                                    th { "Temp. (C)" }
+                                    th { "Temp. (F)" }
+                                    th { "Summary" }
+                                }
+                            }
+                            tbody {
+                                for forecast in forecasts.read().iter().cloned() {
+                                    tr { key: "{forecast.date}",
+                                        td { "{forecast.date}" }
+                                        td { "{forecast.temperature_c}" }
+                                        td { "{forecast.temperature_f}" }
+                                        td { "{forecast.summary}" }
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-            Button { label: "Refresh", onclick: move |_| refresh() }
+            Button { onclick: move |_| refresh(), "Refresh" }
         }
     }
 }

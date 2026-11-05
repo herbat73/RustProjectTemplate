@@ -1,7 +1,12 @@
 use dioxus::prelude::*;
 use types::user::UserInfo;
 
-use crate::{components::buttons::button::Button, services};
+use crate::components::{
+    badge::{Badge, BadgeVariant},
+    button::{Button, ButtonSize, ButtonVariant},
+    card::{Card, CardContent},
+};
+use crate::services;
 
 #[component]
 pub fn UsersTable() -> Element {
@@ -18,43 +23,51 @@ pub fn UsersTable() -> Element {
     use_hook(refresh);
 
     rsx! {
-        div { class: "w-11/12 flex flex-col h-min
-        rounded-md text-lg font-strong overflow-y-auto
-        border-slate-300 dark:border-slate-700 border
-        h-10 px-4 py-2 my-10
-        bg-slate-100 text-slate-800 shadow-md
-        dark:bg-slate-900 dark:text-slate-100",
-            table {
-                thead {
-                    tr { class: "text-left",
-                        th { "UUID" }
-                        th { "Username" }
-                        th { "Email" }
-                        th { "Admin" }
-                        th {}
-                    }
-                }
-                tbody {
-                    for user in users.read().iter().cloned() {
-                        tr { key: "{user.uuid}",
-                            td { "{user.uuid}" }
-                            td { "{user.username}" }
-                            td { "{user.email}" }
-                            td { "{user.is_admin}" }
-                            td {
-                                Button {
-                                    color: "bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700",
-                                    label: "Delete",
-                                    onclick: {
-                                        let uuid = user.uuid.clone();
-                                        move |_| {
-                                            let uuid = uuid.clone();
-                                            spawn(async move {
-                                                let _ = services::user::delete_user(uuid).await;
-                                                refresh();
-                                            });
+        div { class: "w-11/12 my-10 overflow-y-auto",
+            Card {
+                CardContent {
+                    table {
+                        thead {
+                            tr { class: "text-left",
+                                th { "UUID" }
+                                th { "Username" }
+                                th { "Email" }
+                                th { "Admin" }
+                                th {}
+                            }
+                        }
+                        tbody {
+                            for user in users.read().iter().cloned() {
+                                tr { key: "{user.uuid}",
+                                    td { "{user.uuid}" }
+                                    td { "{user.username}" }
+                                    td { "{user.email}" }
+                                    td {
+                                        if user.is_admin {
+                                            Badge { "Admin" }
+                                        } else {
+                                            Badge { variant: BadgeVariant::Secondary,
+                                                "User"
+                                            }
                                         }
-                                    },
+                                    }
+                                    td {
+                                        Button {
+                                            variant: ButtonVariant::Destructive,
+                                            size: ButtonSize::Sm,
+                                            onclick: {
+                                                let uuid = user.uuid.clone();
+                                                move |_| {
+                                                    let uuid = uuid.clone();
+                                                    spawn(async move {
+                                                        let _ = services::user::delete_user(uuid).await;
+                                                        refresh();
+                                                    });
+                                                }
+                                            },
+                                            "Delete"
+                                        }
+                                    }
                                 }
                             }
                         }

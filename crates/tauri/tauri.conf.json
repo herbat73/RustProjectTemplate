@@ -36,8 +36,8 @@
   "build": {
     "devUrl": "http://localhost:8080",
     "frontendDist": "../frontend/dist",
-    "beforeDevCommand": "cd frontend && trunk serve",
-    "beforeBuildCommand": "cd frontend && trunk build"
+    "beforeDevCommand": "cd frontend && dx serve --platform web",
+    "beforeBuildCommand": "cd frontend && dx build --platform web --release"
   },
   "productName": "Tauri App",
   "mainBinaryName": "Tauri App",

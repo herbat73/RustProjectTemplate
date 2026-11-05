@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 use types::user::LoginUser;
 
 use crate::app::AppRoute;
-use crate::components::{buttons::button::Button, error_message::ErrorMessage, input::Input};
+use crate::components::{button::Button, error_message::ErrorMessage, input::Input};
 use crate::hooks::USER_INFO;
 use crate::services::{self, AuthError};
 
@@ -36,7 +36,7 @@ pub fn LoginForm() -> Element {
                 ErrorMessage { message: error.body().message }
             }
             Input {
-                input_type: "text",
+                r#type: "text",
                 placeholder: "Username",
                 oninput: move |ev: FormEvent| {
                     error_state.set(None);
@@ -45,7 +45,7 @@ pub fn LoginForm() -> Element {
                 value: login_user.read().username.clone(),
             }
             Input {
-                input_type: "password",
+                r#type: "password",
                 placeholder: "Password",
                 oninput: move |ev: FormEvent| {
                     error_state.set(None);
@@ -53,7 +53,7 @@ pub fn LoginForm() -> Element {
                 },
                 value: login_user.read().pass.clone(),
             }
-            Button { onclick: move |_| handle_login(), label: "Login" }
+            Button { r#type: "submit", "Login" }
         }
     }
 }

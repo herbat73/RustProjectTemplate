@@ -4,7 +4,11 @@ use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{CloseEvent, MessageEvent, WebSocket};
 
 use crate::{
-    components::{buttons::button::Button, input::Input},
+    components::{
+        button::{Button, ButtonSize},
+        card::Card,
+        input::Input,
+    },
     graphics::icons::send_icon::SendIcon,
     services::AuthStorage,
 };
@@ -18,7 +22,7 @@ pub fn ChatWindow(#[props(default)] class: String) -> Element {
 
     // Get backend port automatically from tauri command.
     let port = use_resource(|| async {
-        // Outside Tauri (e.g. `trunk serve` in a browser) the invoke bridge does not exist and
+        // Outside Tauri (e.g. `dx serve` in a browser) the invoke bridge does not exist and
         // tauri-sys would panic, so skip it and fall back to the default port below.
         if !is_tauri() {
             return Ok(String::new());
@@ -94,12 +98,7 @@ pub fn ChatWindow(#[props(default)] class: String) -> Element {
 
     rsx! {
         div { class: "{class}",
-            div { class: "h-full px-4 py-2 py-2
-            bg-slate-100 text-slate-800
-            border-slate-300 dark:border-slate-700 border
-            dark:bg-slate-900 dark:text-slate-100
-            rounded-md ring-offset-background disabled:pointer-events-none
-            overflow-y-auto text-wrap shadow-md",
+            Card { style: "height: 100%; padding: 1rem; overflow-y: auto; overflow-wrap: anywhere;",
                 for message in history.read().iter() {
                     p { "{message}" }
                 }
@@ -111,17 +110,16 @@ pub fn ChatWindow(#[props(default)] class: String) -> Element {
                     send_chat();
                 },
                 Input {
-                    input_type: "text",
+                    r#type: "text",
                     placeholder: "Message...",
                     oninput: move |ev: FormEvent| chat_message.set(ev.value()),
                     value: chat_message.read().clone(),
                 }
                 Button {
-                    onclick: move |_| send_chat(),
-                    icon: rsx! {
-                        SendIcon { class: "fill-slate-600 dark:fill-white" }
-                    },
+                    r#type: "submit",
+                    size: ButtonSize::Icon,
                     disabled: chat_disabled(),
+                    SendIcon { class: "fill-current" }
                 }
             }
         }
