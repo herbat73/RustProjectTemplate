@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 
 use crate::app::AppRoute;
 use crate::components::buttons::nav_button::NavButton;
+use crate::components::theme_toggle::ThemeToggle;
 use crate::hooks::use_user_info;
 
 #[component]
@@ -19,7 +20,7 @@ pub fn Header() -> Element {
                     NavButton { label: "Chat", destination: AppRoute::ChatPage {} }
                 }
             }
-            div { class: "flex flex-row h-full pr-12",
+            div { class: "flex flex-row h-full",
                 if logged_in {
                     if user_info.is_admin {
                         NavButton {
@@ -35,6 +36,7 @@ pub fn Header() -> Element {
                     NavButton { label: "Login", destination: AppRoute::Login {} }
                     NavButton { label: "Register", destination: AppRoute::Register {} }
                 }
+                ThemeToggle {}
             }
         }
     }
