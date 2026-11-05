@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::app::AppRoute;
-use crate::components::{buttons::button::Button, error_message::ErrorMessage, input::Input};
+use crate::components::{button::Button, error_message::ErrorMessage, input::Input};
 use crate::services::{self, AuthError, AuthStorage};
 
 #[component]
@@ -36,7 +36,7 @@ pub fn RequestResetForm() -> Element {
                 ErrorMessage { message: error.body().message }
             }
             Input {
-                input_type: "email",
+                r#type: "email",
                 placeholder: "Email",
                 oninput: move |ev: FormEvent| {
                     error_state.set(None);
@@ -44,7 +44,7 @@ pub fn RequestResetForm() -> Element {
                 },
                 value: reset_email.read().clone(),
             }
-            Button { onclick: move |_| handle_reset(), label: "Confirm" }
+            Button { r#type: "submit", "Confirm" }
         }
     }
 }

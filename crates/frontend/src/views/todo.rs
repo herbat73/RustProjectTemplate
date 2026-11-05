@@ -1,7 +1,12 @@
 use dioxus::prelude::*;
 use types::todo::TodoListDto;
 
-use crate::components::{buttons::button::Button, error_message::ErrorMessage, input::Input};
+use crate::components::{
+    button::{Button, ButtonSize, ButtonVariant},
+    card::{Card, CardContent, CardHeader, CardTitle},
+    error_message::ErrorMessage,
+    input::Input,
+};
 use crate::services::{self, AuthError};
 
 #[component]
@@ -46,7 +51,6 @@ pub fn Todo() -> Element {
                     oninput: move |ev: FormEvent| new_list.set(ev.value()),
                 }
                 Button {
-                    label: "Add list",
                     onclick: move |_| {
                         let title = new_list().trim().to_string();
                         if !title.is_empty() {
@@ -54,6 +58,7 @@ pub fn Todo() -> Element {
                             run(Box::pin(services::todo::create_list(title)));
                         }
                     },
+                    "Add list"
                 }
             }
             for list in lists.read().iter().cloned() {
@@ -72,52 +77,67 @@ fn TodoListCard(list: TodoListDto, run: Callback<Job>) -> Element {
     let title = list.title.clone().unwrap_or_default();
 
     rsx! {
-        div { class: "w-11/12 flex flex-col rounded-md text-lg border-slate-300 dark:border-slate-700 border
-                px-4 py-2 space-y-2 bg-slate-100 text-slate-800 shadow-md dark:bg-slate-900 dark:text-slate-100",
-            div { class: "flex flex-row justify-between items-center",
-                span { class: "font-bold", "{title}" }
-                Button {
-                    label: "Delete list",
-                    onclick: move |_| run.call(Box::pin(services::todo::delete_list(list_id))),
-                }
-            }
-            for item in list.items.iter().cloned() {
-                div { key: "{item.id}", class: "flex flex-row items-center space-x-2",
-                    input {
-                        r#type: "checkbox",
-                        checked: item.done,
-                        onchange: {
-                            let item = item.clone();
-                            move |ev: FormEvent| {
-                                let title = item.title.clone().unwrap_or_default();
-                                run.call(Box::pin(services::todo::update_item(item.id, title, ev.checked())));
-                            }
-                        },
-                    }
-                    span { class: if item.done { "grow line-through opacity-60" } else { "grow" },
-                        "{item.title.clone().unwrap_or_default()}"
-                    }
-                    Button {
-                        label: "Delete",
-                        onclick: move |_| run.call(Box::pin(services::todo::delete_item(item.id))),
-                    }
-                }
-            }
-            div { class: "flex flex-row space-x-2",
-                Input {
-                    value: new_item(),
-                    placeholder: "New item",
-                    oninput: move |ev: FormEvent| new_item.set(ev.value()),
-                }
-                Button {
-                    label: "Add",
-                    onclick: move |_| {
-                        let title = new_item().trim().to_string();
-                        if !title.is_empty() {
-                            new_item.set(String::new());
-                            run.call(Box::pin(services::todo::create_item(list_id, title)));
+        div { class: "w-11/12",
+            Card {
+                CardHeader {
+                    div { class: "flex flex-row justify-between items-center",
+                        CardTitle { "{title}" }
+                        Button {
+                            variant: ButtonVariant::Destructive,
+                            size: ButtonSize::Sm,
+                            onclick: move |_| run.call(Box::pin(services::todo::delete_list(list_id))),
+                            "Delete list"
                         }
-                    },
+                    }
+                }
+                CardContent {
+                    div { class: "flex flex-col space-y-2",
+                        for item in list.items.iter().cloned() {
+                            div {
+                                key: "{item.id}",
+                                class: "flex flex-row items-center space-x-2",
+                                input {
+                                    r#type: "checkbox",
+                                    checked: item.done,
+                                    onchange: {
+                                        let item = item.clone();
+                                        move |ev: FormEvent| {
+                                            let title = item.title.clone().unwrap_or_default();
+                                            run.call(
+                                                Box::pin(services::todo::update_item(item.id, title, ev.checked())),
+                                            );
+                                        }
+                                    },
+                                }
+                                span { class: if item.done { "grow line-through opacity-60" } else { "grow" },
+                                    "{item.title.clone().unwrap_or_default()}"
+                                }
+                                Button {
+                                    variant: ButtonVariant::Ghost,
+                                    size: ButtonSize::Sm,
+                                    onclick: move |_| run.call(Box::pin(services::todo::delete_item(item.id))),
+                                    "Delete"
+                                }
+                            }
+                        }
+                        div { class: "flex flex-row space-x-2",
+                            Input {
+                                value: new_item(),
+                                placeholder: "New item",
+                                oninput: move |ev: FormEvent| new_item.set(ev.value()),
+                            }
+                            Button {
+                                onclick: move |_| {
+                                    let title = new_item().trim().to_string();
+                                    if !title.is_empty() {
+                                        new_item.set(String::new());
+                                        run.call(Box::pin(services::todo::create_item(list_id, title)));
+                                    }
+                                },
+                                "Add"
+                            }
+                        }
+                    }
                 }
             }
         }

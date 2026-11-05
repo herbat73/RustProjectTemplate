@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 use types::user::UserInfo;
 
 use crate::components::{
-    buttons::button::Button, error_message::ErrorMessage, user_info_panel::UserInfoPanel,
+    button::Button, error_message::ErrorMessage, user_info_panel::UserInfoPanel,
 };
 use crate::hooks::USER_INFO;
 use crate::services::{self, AuthError};
@@ -19,14 +19,13 @@ pub fn UserView() -> Element {
             UserInfoPanel {}
             div { class: "flex flex-row space-x-4",
                 Button {
-                    label: "Logout",
                     onclick: move |_| {
                         services::auth::logout_user();
                         *USER_INFO.write() = UserInfo::default();
                     },
+                    "Logout"
                 }
                 Button {
-                    label: "Test Auth",
                     onclick: move |_| {
                         spawn(async move {
                             if let Err(error) = services::auth::test_auth_route().await {
@@ -34,6 +33,7 @@ pub fn UserView() -> Element {
                             }
                         });
                     },
+                    "Test Auth"
                 }
             }
         }

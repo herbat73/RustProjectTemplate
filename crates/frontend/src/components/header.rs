@@ -10,8 +10,8 @@ pub fn Header() -> Element {
     let logged_in = !user_info.uuid.is_empty();
 
     rsx! {
-        header { class: "flex flex-row h-12 z-50 fixed top-0 left-0 right-0 border-slate-300 dark:border-slate-700 border-b
-            bg-slate-100 dark:bg-slate-900 shadow-md w-full
+        header { class: "flex flex-row h-12 z-50 fixed top-0 left-0 right-0 border-[var(--primary-color-6)] border-b
+            bg-[var(--primary-color-3)] shadow-md w-full
             justify-between justify-items-center items-center",
             div { class: "flex flex-row h-full",
                 NavButton { label: "Home", destination: AppRoute::Home {} }
@@ -22,9 +22,15 @@ pub fn Header() -> Element {
             div { class: "flex flex-row h-full pr-12",
                 if logged_in {
                     if user_info.is_admin {
-                        NavButton { label: "Admin", destination: AppRoute::AdminPanel {} }
+                        NavButton {
+                            label: "Admin",
+                            destination: AppRoute::AdminPanel {},
+                        }
                     }
-                    NavButton { label: user_info.username.clone(), destination: AppRoute::UserPanel {} }
+                    NavButton {
+                        label: user_info.username.clone(),
+                        destination: AppRoute::UserPanel {},
+                    }
                 } else {
                     NavButton { label: "Login", destination: AppRoute::Login {} }
                     NavButton { label: "Register", destination: AppRoute::Register {} }

@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 use types::user::RegisterUser;
 
 use crate::app::AppRoute;
-use crate::components::{buttons::button::Button, error_message::ErrorMessage, input::Input};
+use crate::components::{button::Button, error_message::ErrorMessage, input::Input};
 use crate::hooks::USER_INFO;
 use crate::services::{self, AuthError};
 
@@ -36,7 +36,7 @@ pub fn RegisterForm() -> Element {
                 ErrorMessage { message: error.body().message }
             }
             Input {
-                input_type: "text",
+                r#type: "text",
                 placeholder: "Username",
                 oninput: move |ev: FormEvent| {
                     error_state.set(None);
@@ -45,7 +45,7 @@ pub fn RegisterForm() -> Element {
                 value: register_user.read().username.clone(),
             }
             Input {
-                input_type: "password",
+                r#type: "password",
                 placeholder: "Password",
                 oninput: move |ev: FormEvent| {
                     error_state.set(None);
@@ -54,7 +54,7 @@ pub fn RegisterForm() -> Element {
                 value: register_user.read().pass.clone(),
             }
             Input {
-                input_type: "email",
+                r#type: "email",
                 placeholder: "Email",
                 oninput: move |ev: FormEvent| {
                     error_state.set(None);
@@ -62,7 +62,7 @@ pub fn RegisterForm() -> Element {
                 },
                 value: register_user.read().email.clone(),
             }
-            Button { onclick: move |_| handle_register(), label: "Register" }
+            Button { r#type: "submit", "Register" }
         }
     }
 }

@@ -50,5 +50,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      - name: Build Tailwind CSS
+        # `dx` generates assets/tailwind.css (gitignored), but `asset!` needs the file to exist at
+        # compile time. Build it with the same Tailwind version `dx` uses.
+        working-directory: crates/frontend
+        run: |
+          curl -sSLo "$RUNNER_TEMP/tailwindcss" https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.5/tailwindcss-linux-x64
+          chmod +x "$RUNNER_TEMP/tailwindcss"
+          "$RUNNER_TEMP/tailwindcss" --input tailwind.css --output assets/tailwind.css
       - name: Check
         run: cargo check -p frontend --target wasm32-unknown-unknown

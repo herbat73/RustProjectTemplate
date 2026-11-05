@@ -8,7 +8,7 @@ use types::{
 };
 
 use crate::app::AppRoute;
-use crate::components::{buttons::button::Button, error_message::ErrorMessage, input::Input};
+use crate::components::{button::Button, error_message::ErrorMessage, input::Input};
 use crate::hooks::USER_INFO;
 use crate::services::{self, AuthError, AuthStorage};
 
@@ -72,7 +72,7 @@ pub fn ResetForm() -> Element {
                 ErrorMessage { message: error.body().message }
             }
             Input {
-                input_type: "password",
+                r#type: "password",
                 placeholder: "Password",
                 oninput: move |ev: FormEvent| {
                     error_state.set(None);
@@ -81,7 +81,7 @@ pub fn ResetForm() -> Element {
                 value: reset_user.read().pass.clone(),
             }
             Input {
-                input_type: "password",
+                r#type: "password",
                 placeholder: "Confirm password",
                 oninput: move |ev: FormEvent| {
                     let value = ev.value();
@@ -95,7 +95,7 @@ pub fn ResetForm() -> Element {
                 },
                 value: confirm_pass.read().clone(),
             }
-            Button { onclick: move |_| handle_reset(()), label: "Confirm" }
+            Button { r#type: "submit", "Confirm" }
         }
     }
 }

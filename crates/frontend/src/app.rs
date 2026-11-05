@@ -12,6 +12,9 @@ use crate::views::{
     weather::Weather,
 };
 
+const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
+const THEME_CSS: Asset = asset!("/assets/dx-components-theme.css");
+
 /// App routes
 #[derive(Routable, Clone, PartialEq, Debug)]
 #[rustfmt::skip]
@@ -43,27 +46,37 @@ pub enum AppRoute {
 
 #[component]
 fn AdminPanel() -> Element {
-    rsx! { AdminRoute { AdminView {} } }
+    rsx! {
+        AdminRoute { AdminView {} }
+    }
 }
 
 #[component]
 fn UserPanel() -> Element {
-    rsx! { ProtectedRoute { UserView {} } }
+    rsx! {
+        ProtectedRoute { UserView {} }
+    }
 }
 
 #[component]
 fn ChatPage() -> Element {
-    rsx! { ProtectedRoute { Chat {} } }
+    rsx! {
+        ProtectedRoute { Chat {} }
+    }
 }
 
 #[component]
 fn WeatherPage() -> Element {
-    rsx! { ProtectedRoute { Weather {} } }
+    rsx! {
+        ProtectedRoute { Weather {} }
+    }
 }
 
 #[component]
 fn TodoPage() -> Element {
-    rsx! { ProtectedRoute { Todo {} } }
+    rsx! {
+        ProtectedRoute { Todo {} }
+    }
 }
 
 #[component]
@@ -71,7 +84,7 @@ fn Shell() -> Element {
     let _user_info = use_user_info();
 
     rsx! {
-        div { class: "flex flex-col space-between w-screen h-screen bg-slate-50 dark:bg-slate-700 overflow-hidden",
+        div { class: "flex flex-col space-between w-screen h-screen bg-[var(--primary-color-1)] text-[var(--secondary-color-4)] overflow-hidden",
             Header {}
             main { class: "grid grid-rows-24 grid-cols-12 auto-rows-auto h-full w-full py-12",
                 Outlet::<AppRoute> {}
@@ -83,5 +96,9 @@ fn Shell() -> Element {
 
 #[component]
 pub fn App() -> Element {
-    rsx! { Router::<AppRoute> {} }
+    rsx! {
+        document::Stylesheet { href: TAILWIND_CSS }
+        document::Stylesheet { href: THEME_CSS }
+        Router::<AppRoute> {}
+    }
 }

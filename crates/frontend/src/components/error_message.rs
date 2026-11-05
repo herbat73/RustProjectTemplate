@@ -1,10 +1,12 @@
 use dioxus::prelude::*;
 
+use crate::components::badge::{Badge, BadgeVariant};
+
 #[component]
 pub fn ErrorMessage(message: String) -> Element {
     rsx! {
-        div { class: "px-4 py-2 rounded-md bg-red-300 text-red-600 border border-red-600 text-center shadow-md",
-            "{message}"
+        div { class: "flex justify-center", role: "alert",
+            Badge { variant: BadgeVariant::Destructive, "{message}" }
         }
     }
 }

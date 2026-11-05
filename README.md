@@ -3,8 +3,8 @@
 Refactored and modified [full stack rust template](https://github.com/sollambert/rust-full-stack-with-auth-template) 
 
 Built using:
-- Dioxus
-- Tailwinds
+- Dioxus, with [Dioxus components](https://github.com/DioxusLabs/components) (shadcn-style UI)
+- Tailwinds (v4)
 - Axum
 - Sqlx
 - Utoipa
@@ -29,7 +29,7 @@ The specific flavor of SQL is inferred from DATABASE_URL environment variable, h
 
 ## Crates
 
-- `frontend`: Dioxus frontend app for desktop client.
+- `frontend`: Dioxus frontend app for desktop client, built with the `dx` CLI.
 - `backend`: Axum backend restful and websocket api for desktop client.
 - `server`: Axum server side restful and websocket api.
 - `types`: Common types shared by frontend/backend/server.
@@ -41,7 +41,7 @@ Install
 
 ```bash
 rustup target add wasm32-unknown-unknown
-cargo install trunk
+cargo install dioxus-cli --locked   # `dx`; on macOS needs OpenSSL (brew install openssl@3)
 cargo install tauri-cli
 cargo install sqlx-cli
 ```
@@ -67,8 +67,32 @@ cargo tauri build
 Run web frontend
 ```bash
 cd crates/frontend
-trunk serve
+dx serve --platform web
 ```
+
+`dx` also builds the Tailwind CSS into `crates/frontend/assets/tailwind.css` (gitignored). Run `dx build` or
+`dx serve` once before a plain `cargo check -p frontend`, otherwise the `asset!` macro fails because the file
+is missing. CI builds it with the standalone Tailwind CLI.
+
+## UI components
+
+The UI uses shadcn-style components from [DioxusLabs/components](https://github.com/DioxusLabs/components)
+(`button`, `input`, `card`, `badge`), copied into `crates/frontend/src/components/<name>/` and built on the
+unstyled `dioxus-primitives` crate. They are styled with plain CSS and the theme variables in
+`crates/frontend/assets/dx-components-theme.css` (light/dark follows the system setting); Tailwind is used
+for layout.
+
+```bash
+cd crates/frontend
+dx components list          # available components
+dx components add dialog    # copy a component into src/components/ and add `pub mod dialog;`
+dx components update        # refresh the registry
+```
+
+Notes:
+- The components load their CSS through Dioxus assets, so the frontend must be built with `dx`, not Trunk.
+- A component's `class` attribute can replace its own styling, so use `style` or a wrapper element for
+  layout tweaks.
 
 Run migrations (creates the database first if it does not exist)
 ```bash

@@ -25,3 +25,6 @@ dist
 
 # env examples are committed
 !.env.example
+
+# dx-generated tailwind output
+crates/frontend/assets/tailwind.css
