@@ -52,6 +52,8 @@ Run desktop client app
 cargo tauri dev
 ```
 
+![TauriApp](docs/TauriApp.png)
+
 Run server side
 
 ```bash
@@ -64,11 +66,14 @@ Bundle desktop client app
 cargo tauri build
 ```
 
+
 Run web frontend
 ```bash
 cd crates/frontend
 dx serve --platform web
 ```
+
+![WebApp](docs/WebApp.png)
 
 `dx` also builds the Tailwind CSS into `crates/frontend/assets/tailwind.css` (gitignored). Run `dx build` or
 `dx serve` once before a plain `cargo check -p frontend`, otherwise the `asset!` macro fails because the file
