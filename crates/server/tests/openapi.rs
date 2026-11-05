@@ -59,7 +59,8 @@ fn spec_is_openapi_3_2_and_documents_every_route() {
 
 #[tokio::test]
 async fn spec_and_ui_are_served() {
-    let app = server::app();
+    // The documentation routes need no application state (and thus no database).
+    let app = server::openapi::routes::<()>();
 
     let response = app
         .clone()

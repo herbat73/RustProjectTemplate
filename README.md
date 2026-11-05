@@ -25,15 +25,32 @@ Through frontend middleware, this process is handled automatically and the autho
 
 Web socket authentication functions slightly differently, as the authentication handshake occurs through the first message of a freshly opened websocket instead of being sent as a Bearer auth header.
 
-The specific flavor of SQL is inferred from DATABASE_URL environment variable, however this package does allow for conditionally compiling with explicit support for SQLite and Postgres through their respective features if you would like to use flavor-specific syntax in constructed queries.
+The specific flavor of SQL (Postgres or SQLite) is inferred from the `DATABASE_URL` environment variable.
 
 ## Crates
 
 - `frontend`: Dioxus frontend app for desktop client, built with the `dx` CLI.
 - `backend`: Axum backend restful and websocket api for desktop client.
-- `server`: Axum server side restful and websocket api.
-- `types`: Common types shared by frontend/backend/server.
+- `server`: Axum server side restful and websocket api (presentation layer and composition root).
+- `domain`: Entities, business rules and repository interfaces of the server. No framework dependencies.
+- `application`: Use cases of the server and the ports (interfaces) they need, e.g. password hashing, tokens, mail.
+- `infrastructure`: Implementations of those ports: sqlx repositories, bcrypt, JWT, SMTP, in-memory stores.
+- `types`: Common types shared by frontend/backend/server (the API contract).
 - `tauri`: Tauri app for desktop client.
+
+### Server architecture
+
+The server follows Clean Architecture. Dependencies only point inwards, and the compiler enforces it because each layer is its own crate:
+
+```
+server (axum controllers, composition root) ──┬──> application ──> domain <── infrastructure (sqlx, bcrypt, JWT, SMTP)
+                                              └─────────────────────────────────────────────^
+                                                  (only `bootstrap` wires infrastructure in)
+```
+
+- Controllers extract the request, call a use case on `application` and map the result to a response.
+- Use cases (`AuthService`, `UserService`, `TodoService`, `WeatherService`) depend on traits, so they are unit tested with in-memory fakes and need no database.
+- `server::bootstrap` is the only place that knows the concrete implementations. Add a feature by defining its entity and repository trait in `domain`, the use case in `application`, the SQL in `infrastructure` and the route in `server`.
 
 ## Development
 

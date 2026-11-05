@@ -13,10 +13,8 @@ async fn main() {
         };
     }
 
-    //create pg pool
-    server::pool::create_pool().await;
-
-    let app = server::app();
+    let state = server::bootstrap::state_from_env().await;
+    let app = server::app(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
     println!("Server listening on http://{}", addr);

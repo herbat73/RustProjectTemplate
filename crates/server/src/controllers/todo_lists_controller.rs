@@ -1,65 +1,21 @@
+use application::AppError;
 use axum::{
     Router,
-    extract::{Json, Path},
-    http::{HeaderMap, StatusCode},
-    middleware,
+    extract::{Json, Path, State},
+    http::StatusCode,
     routing::{get, put},
 };
 use types::{
-    auth::{AuthErrorBody, AuthErrorType},
-    todo::{COLOURS, CreateTodoListCommand, TodosVm, UpdateTodoListCommand},
+    auth::AuthErrorBody,
+    todo::{CreateTodoListCommand, TodosVm, UpdateTodoListCommand},
 };
 
-use crate::{
-    middleware::token_authentication,
-    strategies::{
-        authentication::{AuthClaims, AuthError, Claims},
-        todo,
-        users::get_db_user_by_uuid,
-    },
-};
+use crate::{error::ApiError, extractors::AccessUser, mapping::todo_list_dto, state::AppState};
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(get_todo_lists).post(create_todo_list))
         .route("/{id}", put(update_todo_list).delete(delete_todo_list))
-        .layer(middleware::from_fn(
-            token_authentication::authenticate_token::<AuthClaims>,
-        ))
-}
-
-/// Resolves the id of the authenticated user from the verified token claims.
-pub(super) async fn current_user_id(headers: &HeaderMap) -> Result<i32, AuthError> {
-    let claims = AuthClaims::from_header(headers);
-    get_db_user_by_uuid(claims.sub)
-        .await
-        .map(|user| user.id)
-        .map_err(|_| AuthError::from_error_type(AuthErrorType::UserDoesNotExist))
-}
-
-fn db_error(error: sqlx::Error) -> AuthError {
-    println!("{error}");
-    AuthError::from_error_type(AuthErrorType::ServerError)
-}
-
-/// A title is required and limited to 200 characters.
-pub(super) fn validate_title(title: Option<String>) -> Result<String, AuthError> {
-    match title.map(|t| t.trim().to_string()) {
-        Some(t) if !t.is_empty() && t.chars().count() <= 200 => Ok(t),
-        _ => Err(AuthError::from_error_type(AuthErrorType::MissingFields)),
-    }
-}
-
-/// Normalizes a colour code (case-insensitive) to one of the supported codes.
-fn validate_colour(colour: Option<String>) -> Result<Option<String>, AuthError> {
-    match colour {
-        None => Ok(None),
-        Some(c) => COLOURS
-            .iter()
-            .find(|(code, _)| code.eq_ignore_ascii_case(c.trim()))
-            .map(|(code, _)| Some((*code).to_string()))
-            .ok_or_else(|| AuthError::from_error_type(AuthErrorType::BadRequest)),
-    }
 }
 
 /// Retrieves all todo lists of the authenticated user along with their items.
@@ -75,11 +31,15 @@ fn validate_colour(colour: Option<String>) -> Result<Option<String>, AuthError> 
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn get_todo_lists(headers: HeaderMap) -> Result<(StatusCode, Json<TodosVm>), AuthError> {
-    let lists = todo::get_lists_with_items(current_user_id(&headers).await?)
-        .await
-        .map_err(db_error)?;
-    Ok((StatusCode::OK, Json(TodosVm::new(lists))))
+pub async fn get_todo_lists(
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
+) -> Result<(StatusCode, Json<TodosVm>), ApiError> {
+    let lists = state.todos.lists(&claims.user_uuid).await?;
+    Ok((
+        StatusCode::OK,
+        Json(TodosVm::new(lists.into_iter().map(todo_list_dto).collect())),
+    ))
 }
 
 /// Creates a new todo list and returns the ID of the created list.
@@ -98,15 +58,14 @@ pub async fn get_todo_lists(headers: HeaderMap) -> Result<(StatusCode, Json<Todo
     )
 )]
 pub async fn create_todo_list(
-    headers: HeaderMap,
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
     Json(command): Json<CreateTodoListCommand>,
-) -> Result<(StatusCode, Json<i32>), AuthError> {
-    let user_id = current_user_id(&headers).await?;
-    let title = validate_title(command.title)?;
-    let colour = validate_colour(command.colour)?.unwrap_or_else(|| COLOURS[0].0.to_string());
-    let id = todo::insert_list(user_id, title, colour)
-        .await
-        .map_err(db_error)?;
+) -> Result<(StatusCode, Json<i32>), ApiError> {
+    let id = state
+        .todos
+        .create_list(&claims.user_uuid, command.title, command.colour)
+        .await?;
     Ok((StatusCode::CREATED, Json(id)))
 }
 
@@ -128,24 +87,19 @@ pub async fn create_todo_list(
     )
 )]
 pub async fn update_todo_list(
-    headers: HeaderMap,
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
     Path(id): Path<i32>,
     Json(command): Json<UpdateTodoListCommand>,
-) -> Result<StatusCode, AuthError> {
+) -> Result<StatusCode, ApiError> {
     if id != command.id {
-        return Err(AuthError::from_error_type(AuthErrorType::BadRequest));
+        return Err(AppError::BadRequest.into());
     }
-    let title = validate_title(command.title)?;
-    let colour = validate_colour(command.colour)?;
-    let user_id = current_user_id(&headers).await?;
-    if todo::update_list(user_id, id, title, colour)
-        .await
-        .map_err(db_error)?
-    {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(AuthError::from_error_type(AuthErrorType::NotFound))
-    }
+    state
+        .todos
+        .update_list(&claims.user_uuid, id, command.title, command.colour)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Deletes the todo list with the specified ID, together with its items.
@@ -164,13 +118,10 @@ pub async fn update_todo_list(
     )
 )]
 pub async fn delete_todo_list(
-    headers: HeaderMap,
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
     Path(id): Path<i32>,
-) -> Result<StatusCode, AuthError> {
-    let user_id = current_user_id(&headers).await?;
-    if todo::delete_list(user_id, id).await.map_err(db_error)? {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(AuthError::from_error_type(AuthErrorType::NotFound))
-    }
+) -> Result<StatusCode, ApiError> {
+    state.todos.delete_list(&claims.user_uuid, id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

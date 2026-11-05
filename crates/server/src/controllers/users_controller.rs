@@ -1,51 +1,20 @@
+use application::AppError;
 use axum::{
     RequestExt, Router,
-    extract::{Json, Request},
+    extract::{Json, Request, State},
     http::StatusCode,
-    middleware,
     routing::{delete, get},
 };
+use types::{auth::AuthErrorBody, user::UserInfo};
 
-use types::{
-    auth::{AuthErrorBody, AuthErrorType},
-    user::UserInfo,
-};
-
-use crate::{
-    middleware::token_authentication,
-    strategies::{
-        authentication::{AuthClaims, AuthError, Claims},
-        users::{delete_user_by_uuid, get_all_users, get_db_user_by_uuid},
-    },
-};
+use crate::{error::ApiError, extractors::AccessUser, mapping::user_info, state::AppState};
 
 // route function to nest endpoints in router
-pub fn routes() -> Router {
-    // create routes
+pub fn routes() -> Router<AppState> {
     Router::new()
-        .nest(
-            "/info",
-            Router::new()
-                .route("/", get(get_user_info))
-                .layer(middleware::from_fn(
-                    token_authentication::authenticate_token::<AuthClaims>,
-                )),
-        )
-        .nest(
-            "/all",
-            Router::new()
-                .route("/", get(get_all_user_info))
-                .layer(middleware::from_fn(
-                    token_authentication::authenticate_token::<AuthClaims>,
-                )),
-        )
-        .merge(
-            Router::new()
-                .route("/", delete(delete_user))
-                .layer(middleware::from_fn(
-                    token_authentication::authenticate_token::<AuthClaims>,
-                )),
-        )
+        .nest("/info", Router::new().route("/", get(get_user_info)))
+        .nest("/all", Router::new().route("/", get(get_all_user_info)))
+        .merge(Router::new().route("/", delete(delete_user)))
 }
 
 // get user info by JWT claims
@@ -61,16 +30,14 @@ pub fn routes() -> Router {
         (status = 404, description = "User does not exist", body = AuthErrorBody),
     )
 )]
-pub async fn get_user_info(request: Request) -> Result<(StatusCode, Json<UserInfo>), AuthError> {
-    // generate AuthClaims from encoded x-claim header
-    let claims = AuthClaims::from_header(request.headers());
-    match get_db_user_by_uuid(claims.sub).await {
-        Ok(user) => Ok((StatusCode::OK, axum::Json(UserInfo::from_user(user)))),
-        Err(_) => Err(AuthError::from_error_type(AuthErrorType::UserDoesNotExist)),
-    }
+pub async fn get_user_info(
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
+) -> Result<(StatusCode, Json<UserInfo>), ApiError> {
+    let user = state.users.get(&claims.user_uuid).await?;
+    Ok((StatusCode::OK, Json(user_info(user))))
 }
 
-// get user info by JWT claims
 /// Lists all users. Admin only.
 #[utoipa::path(
     get,
@@ -83,18 +50,14 @@ pub async fn get_user_info(request: Request) -> Result<(StatusCode, Json<UserInf
     )
 )]
 pub async fn get_all_user_info(
-    request: Request,
-) -> Result<(StatusCode, Json<Vec<UserInfo>>), AuthError> {
-    // generate AuthRequesterClaims from encoded x-claim header
-    let claims = AuthClaims::from_header(request.headers());
-    if claims.acc {
-        match get_all_users().await {
-            Ok(users) => Ok((StatusCode::OK, axum::Json(users))),
-            Err(_) => Err(AuthError::from_error_type(AuthErrorType::UserDoesNotExist)),
-        }
-    } else {
-        Err(AuthError::from_error_type(AuthErrorType::AccessDenied))
-    }
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
+) -> Result<(StatusCode, Json<Vec<UserInfo>>), ApiError> {
+    let users = state.users.list_all(&claims).await?;
+    Ok((
+        StatusCode::OK,
+        Json(users.into_iter().map(user_info).collect()),
+    ))
 }
 
 /// Deletes a user by UUID. Admin only. The request body is the plain-text UUID.
@@ -111,24 +74,16 @@ pub async fn get_all_user_info(
         (status = 500, description = "Server error", body = AuthErrorBody),
     )
 )]
-pub async fn delete_user(request: Request) -> Result<StatusCode, AuthError> {
-    // generate AuthRequesterClaims from encoded x-claim header
-    let claims = AuthClaims::from_header(request.headers());
-    let uuid = request.extract().await;
-    match uuid {
-        Ok(uuid) => {
-            if claims.acc {
-                match delete_user_by_uuid(uuid).await {
-                    Ok(_) => Ok(StatusCode::OK),
-                    Err(_) => Err(AuthError::from_error_type(AuthErrorType::UserDoesNotExist)),
-                }
-            } else {
-                Err(AuthError::from_error_type(AuthErrorType::AccessDenied))
-            }
-        }
-        Err(error) => {
-            println!("{error}");
-            Err(AuthError::from_error_type(AuthErrorType::ServerError))
-        }
-    }
+pub async fn delete_user(
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
+    request: Request,
+) -> Result<StatusCode, ApiError> {
+    let uuid: String = request.extract().await.map_err(|error| {
+        AppError::Internal(format!(
+            "Could not read the user uuid from the request body: {error}"
+        ))
+    })?;
+    state.users.delete(&claims, &uuid).await?;
+    Ok(StatusCode::OK)
 }
