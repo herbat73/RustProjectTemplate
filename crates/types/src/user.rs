@@ -3,46 +3,6 @@ use std::{fmt, str::FromStr};
 use email_address::EmailAddress;
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "sqlx")]
-use sqlx::{FromRow, Row, any::AnyRow};
-
-#[derive(Clone, Debug, Serialize)]
-pub struct User {
-    pub id: i32,
-    pub uuid: String,
-    pub username: String,
-    pub pass: String,
-    pub email: EmailAddress,
-    pub is_admin: bool,
-}
-
-#[cfg(feature = "sqlx")]
-impl<'r> FromRow<'r, AnyRow> for User {
-    fn from_row(row: &AnyRow) -> Result<Self, sqlx::Error> {
-        let id: i32 = row.try_get("id")?;
-        let uuid: String = row.try_get("uuid")?;
-        let username: String = row.try_get("username")?;
-        let pass: String = row.try_get("pass")?;
-        let email: EmailAddress = match row.try_get::<String, &str>("email") {
-            Ok(email_str) => EmailAddress::new_unchecked(email_str),
-            Err(e) => {
-                println!("{}", e);
-                EmailAddress::new_unchecked("")
-            }
-        };
-        let is_admin: bool = row.try_get("is_admin")?;
-
-        Ok(Self {
-            id,
-            uuid,
-            username,
-            pass,
-            email,
-            is_admin,
-        })
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RegisterUser {
@@ -126,7 +86,6 @@ impl ResetUser {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
-#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UserInfo {
     pub uuid: String,
@@ -146,14 +105,6 @@ impl fmt::Display for UserInfo {
 }
 
 impl UserInfo {
-    pub fn from_user(user: User) -> Self {
-        Self {
-            uuid: user.uuid,
-            username: user.username,
-            email: user.email.to_string(),
-            is_admin: user.is_admin,
-        }
-    }
     pub fn new() -> Self {
         Self {
             uuid: String::new(),

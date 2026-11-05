@@ -1,43 +1,22 @@
+use application::AppError;
 use axum::{
     Router,
-    extract::{Json, Path},
-    http::{HeaderMap, StatusCode},
-    middleware,
+    extract::{Json, Path, State},
+    http::StatusCode,
     routing::{patch, post, put},
 };
 use types::{
-    auth::{AuthErrorBody, AuthErrorType},
-    todo::{
-        CreateTodoItemCommand, PRIORITY_LEVELS, UpdateTodoItemCommand, UpdateTodoItemDetailCommand,
-    },
+    auth::AuthErrorBody,
+    todo::{CreateTodoItemCommand, UpdateTodoItemCommand, UpdateTodoItemDetailCommand},
 };
 
-use super::todo_lists_controller::{current_user_id, validate_title};
-use crate::{
-    middleware::token_authentication,
-    strategies::{
-        authentication::{AuthClaims, AuthError},
-        todo,
-    },
-};
+use crate::{error::ApiError, extractors::AccessUser, state::AppState};
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", post(create_todo_item))
         .route("/{id}", put(update_todo_item).delete(delete_todo_item))
         .route("/UpdateDetail/{id}", patch(update_todo_item_detail))
-        .layer(middleware::from_fn(
-            token_authentication::authenticate_token::<AuthClaims>,
-        ))
-}
-
-fn db_error(error: sqlx::Error) -> AuthError {
-    println!("{error}");
-    AuthError::from_error_type(AuthErrorType::ServerError)
-}
-
-fn not_found() -> AuthError {
-    AuthError::from_error_type(AuthErrorType::NotFound)
 }
 
 /// Creates a new todo item and returns the ID of the created item.
@@ -57,20 +36,14 @@ fn not_found() -> AuthError {
     )
 )]
 pub async fn create_todo_item(
-    headers: HeaderMap,
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
     Json(command): Json<CreateTodoItemCommand>,
-) -> Result<(StatusCode, Json<i32>), AuthError> {
-    let user_id = current_user_id(&headers).await?;
-    let title = validate_title(command.title)?;
-    if !todo::list_exists(user_id, command.list_id)
-        .await
-        .map_err(db_error)?
-    {
-        return Err(not_found());
-    }
-    let id = todo::insert_item(command.list_id, title)
-        .await
-        .map_err(db_error)?;
+) -> Result<(StatusCode, Json<i32>), ApiError> {
+    let id = state
+        .todos
+        .create_item(&claims.user_uuid, command.list_id, command.title)
+        .await?;
     Ok((StatusCode::CREATED, Json(id)))
 }
 
@@ -92,23 +65,19 @@ pub async fn create_todo_item(
     )
 )]
 pub async fn update_todo_item(
-    headers: HeaderMap,
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
     Path(id): Path<i32>,
     Json(command): Json<UpdateTodoItemCommand>,
-) -> Result<StatusCode, AuthError> {
+) -> Result<StatusCode, ApiError> {
     if id != command.id {
-        return Err(AuthError::from_error_type(AuthErrorType::BadRequest));
+        return Err(AppError::BadRequest.into());
     }
-    let title = validate_title(command.title)?;
-    let user_id = current_user_id(&headers).await?;
-    if todo::update_item(user_id, id, title, command.done)
-        .await
-        .map_err(db_error)?
-    {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(not_found())
-    }
+    state
+        .todos
+        .update_item(&claims.user_uuid, id, command.title, command.done)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Updates the detail fields (list, priority, note) of a todo item. The ID in the URL must match the ID in the payload.
@@ -129,32 +98,25 @@ pub async fn update_todo_item(
     )
 )]
 pub async fn update_todo_item_detail(
-    headers: HeaderMap,
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
     Path(id): Path<i32>,
     Json(command): Json<UpdateTodoItemDetailCommand>,
-) -> Result<StatusCode, AuthError> {
-    if id != command.id
-        || !PRIORITY_LEVELS
-            .iter()
-            .any(|(level, _)| *level == command.priority)
-    {
-        return Err(AuthError::from_error_type(AuthErrorType::BadRequest));
+) -> Result<StatusCode, ApiError> {
+    if id != command.id {
+        return Err(AppError::BadRequest.into());
     }
-    let user_id = current_user_id(&headers).await?;
-    if !todo::list_exists(user_id, command.list_id)
-        .await
-        .map_err(db_error)?
-    {
-        return Err(not_found());
-    }
-    if todo::update_item_detail(user_id, id, command.list_id, command.priority, command.note)
-        .await
-        .map_err(db_error)?
-    {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(not_found())
-    }
+    state
+        .todos
+        .update_item_detail(
+            &claims.user_uuid,
+            id,
+            command.list_id,
+            command.priority,
+            command.note,
+        )
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Deletes the todo item with the specified ID.
@@ -173,13 +135,10 @@ pub async fn update_todo_item_detail(
     )
 )]
 pub async fn delete_todo_item(
-    headers: HeaderMap,
+    State(state): State<AppState>,
+    AccessUser(claims): AccessUser,
     Path(id): Path<i32>,
-) -> Result<StatusCode, AuthError> {
-    let user_id = current_user_id(&headers).await?;
-    if todo::delete_item(user_id, id).await.map_err(db_error)? {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(not_found())
-    }
+) -> Result<StatusCode, ApiError> {
+    state.todos.delete_item(&claims.user_uuid, id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

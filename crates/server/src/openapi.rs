@@ -129,7 +129,10 @@ const SWAGGER_UI: &str = r##"<!DOCTYPE html>
 </html>"##;
 
 /// Routes serving the OpenAPI document (`/api-docs/openapi.json`) and a Swagger UI page (`/api-docs`).
-pub fn routes() -> Router {
+pub fn routes<S>() -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
     Router::new()
         .route("/api-docs/openapi.json", get(|| async { Json(openapi()) }))
         .route("/api-docs", get(|| async { Html(SWAGGER_UI) }))

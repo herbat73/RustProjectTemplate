@@ -1,17 +1,22 @@
+//! Presentation layer: the HTTP and WebSocket API. Handlers only translate requests into
+//! calls of the `application` use cases and their results into responses.
+
 use axum::Router;
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
-use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 
+pub mod bootstrap;
 pub mod controllers;
-pub mod middleware;
+pub mod error;
+pub mod extractors;
+pub mod mapping;
 pub mod openapi;
-pub mod pool;
-pub mod strategies;
+pub mod state;
+
+pub use state::AppState;
 
 /// Builds the application router with all routes and the CORS layer.
-/// The database pool must be created (see [`pool::create_pool`]) before serving requests.
-pub fn app() -> Router {
+pub fn app(state: AppState) -> Router {
     let cors = CorsLayer::permissive()
         .allow_origin(Any)
         .allow_headers([AUTHORIZATION, CONTENT_TYPE])
@@ -34,5 +39,6 @@ pub fn app() -> Router {
             controllers::todo_lists_controller::routes(),
         )
         .merge(openapi::routes())
-        .layer(ServiceBuilder::new().layer(cors))
+        .layer(cors)
+        .with_state(state)
 }

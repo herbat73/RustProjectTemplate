@@ -1,0 +1,16 @@
+[package]
+name = "application"
+version = "0.1.0"
+edition = "2024"
+
+# Application business rules: use cases and the ports (interfaces) they need from the outside.
+# Depends on `domain` only; never on web frameworks, databases or other infrastructure.
+
+[dependencies]
+domain = { path = "../domain" }
+async-trait = "0.1"
+email_address = "0.2.9"
+uuid = { version = "1.29.0", features = ["v4"] }
+
+[dev-dependencies]
+tokio = { version = "1.54", features = ["macros", "rt"] }

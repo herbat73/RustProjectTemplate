@@ -1,0 +1,10 @@
+[package]
+name = "domain"
+version = "0.1.0"
+edition = "2024"
+
+# Enterprise business rules: entities and repository interfaces.
+# Must not depend on any framework, database driver or other workspace crate.
+
+[dependencies]
+async-trait = "0.1"

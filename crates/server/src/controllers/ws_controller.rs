@@ -1,33 +1,48 @@
-use axum::{Router, routing::get};
 use axum::{
+    Router,
     extract::{
         State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
     response::IntoResponse,
+    routing::get,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
-use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
-use crate::strategies::authentication::{AuthRequesterClaims, Claims};
-use crate::strategies::users::get_db_user_by_uuid;
+use crate::state::AppState;
 
-struct AppState {
-    user_set: Mutex<HashSet<String>>,
+/// Fan-out of chat messages to all connected sockets.
+#[derive(Clone)]
+pub struct ChatHub {
     tx: broadcast::Sender<String>,
 }
 
+impl ChatHub {
+    pub fn new() -> Self {
+        let (tx, _rx) = broadcast::channel(100);
+        Self { tx }
+    }
+
+    fn subscribe(&self) -> broadcast::Receiver<String> {
+        self.tx.subscribe()
+    }
+
+    fn broadcast(&self, message: String) {
+        // Fails only when nobody is listening.
+        let _ = self.tx.send(message);
+    }
+}
+
+impl Default for ChatHub {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // route function to nest endpoints in router
-pub fn routes() -> Router {
-    let user_set = Mutex::new(HashSet::new());
-    let (tx, _rx) = broadcast::channel(100);
-    let app_state = Arc::new(AppState { user_set, tx });
-    // create routes
-    Router::new()
-        .route("/", get(ws_handler))
-        .with_state(app_state)
+pub fn routes() -> Router<AppState> {
+    Router::new().route("/", get(ws_handler))
 }
 
 /// Documentation-only description of the chat WebSocket endpoint (OpenAPI cannot model WebSocket messages).
@@ -44,36 +59,36 @@ pub fn routes() -> Router {
 #[allow(dead_code)]
 pub fn ws_docs() {}
 
-async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
-async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
+async fn handle_socket(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
-    let mut username = String::new();
-    while let Some(Ok(auth)) = receiver.next().await {
-        if let Message::Text(text) = auth {
-            if let Ok(claims) = AuthRequesterClaims::from_string(&text) {
-                username = get_db_user_by_uuid(claims.sub.clone())
-                    .await
-                    .unwrap()
-                    .username;
-                break;
-            } else {
-                sender.close().await.unwrap();
-                return;
+
+    // The first text message authenticates the connection.
+    let username = loop {
+        match receiver.next().await {
+            Some(Ok(Message::Text(token))) => {
+                match state.auth.user_for_requester_token(&token).await {
+                    Ok(user) => break user.username,
+                    Err(_) => {
+                        let _ = sender.close().await;
+                        return;
+                    }
+                }
             }
+            Some(Ok(_)) => continue,
+            _ => return,
         }
-    }
+    };
 
-    let mut rx = state.tx.subscribe();
-
-    let msg = format!("{username} joined.");
-    let _ = state.tx.send(msg);
+    let mut rx = state.chat.subscribe();
+    state.chat.broadcast(format!("{username} joined."));
 
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
-            if msg == String::new() {
+            if msg.is_empty() {
                 break;
             }
             if sender.send(Message::Text(msg.into())).await.is_err() {
@@ -82,15 +97,15 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         }
     });
 
-    let tx = state.tx.clone();
+    let chat = state.chat.clone();
     let name = username.clone();
 
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(text))) = receiver.next().await {
-            if text == String::new() {
+            if text.is_empty() {
                 break;
             }
-            let _ = tx.send(format!("{name}: {text}"));
+            chat.broadcast(format!("{name}: {text}"));
         }
     });
 
@@ -99,8 +114,5 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         _ = (&mut recv_task) => send_task.abort(),
     };
 
-    let msg = format!("{username} left.");
-    let _ = state.tx.send(msg);
-
-    state.user_set.lock().unwrap().remove(&username);
+    state.chat.broadcast(format!("{username} left."));
 }

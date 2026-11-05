@@ -94,7 +94,7 @@ async fn get(app: &Router, uri: &str, bearer: Option<&str>) -> Response {
     send(app, Method::GET, uri, bearer, Body::empty(), false).await
 }
 
-async fn setup() -> Option<Router> {
+async fn setup() -> Option<(Router, infrastructure::db::DbPool)> {
     let _ = dotenv::dotenv();
     let Some(database_url) = std::env::var("TEST_DATABASE_URL")
         .or_else(|_| std::env::var("DATABASE_URL"))
@@ -113,12 +113,15 @@ async fn setup() -> Option<Router> {
         std::env::set_var("COMPANY_NAME", "TestCo");
         std::env::set_var("COMPANY_DOMAIN", "test.example.com");
     }
-    server::pool::create_pool().await;
+    let pool = infrastructure::db::connect_from_env().await;
     sqlx::migrate!("../../migrations/postgres")
-        .run(&server::pool::get_pool())
+        .run(&pool)
         .await
         .expect("migrations should apply");
-    Some(server::app())
+    Some((
+        server::app(server::bootstrap::state_with_pool(pool.clone())),
+        pool,
+    ))
 }
 
 /// Decodes the (unverified) payload of a JWT.
@@ -155,10 +158,12 @@ async fn access_token(app: &Router, requester: &str) -> String {
     response.authorization.clone().expect("access token header")
 }
 
-// One test function: the pool is a process-wide singleton bound to this test's runtime.
+// One test function: it creates the users it needs and removes them again at the end.
 #[tokio::test]
 async fn api_flow() {
-    let Some(app) = setup().await else { return };
+    let Some((app, pool)) = setup().await else {
+        return;
+    };
     let suffix = uuid::Uuid::new_v4().simple().to_string()[..12].to_string();
     let alice = format!("alice_{suffix}");
     let bob = format!("bob_{suffix}");
@@ -812,7 +817,7 @@ async fn api_flow() {
     // promote alice to admin directly in the database, then get a fresh access token
     sqlx::query("UPDATE users SET is_admin = true WHERE username = $1")
         .bind(&alice)
-        .execute(&server::pool::get_pool())
+        .execute(&pool)
         .await
         .expect("promote alice");
     let admin_access = access_token(&app, &requester).await;
@@ -885,12 +890,12 @@ async fn api_flow() {
     // --- cleanup ---
     sqlx::query("DELETE FROM users WHERE username = $1")
         .bind(&carol)
-        .execute(&server::pool::get_pool())
+        .execute(&pool)
         .await
         .expect("cleanup carol");
     sqlx::query("DELETE FROM users WHERE username = $1")
         .bind(&alice)
-        .execute(&server::pool::get_pool())
+        .execute(&pool)
         .await
         .expect("cleanup alice");
 }

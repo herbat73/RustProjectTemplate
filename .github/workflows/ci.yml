@@ -39,7 +39,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Test
         # The Tauri crate (`app`) needs system GUI libraries and the frontend is built in its own job.
-        run: cargo test -p server -p types -p backend
+        run: cargo test -p domain -p application -p infrastructure -p server -p types -p backend
 
   frontend:
     name: Frontend (wasm)
